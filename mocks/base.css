@@ -1,0 +1,27 @@
+@font-face { font-family: "Funnel Display"; src: url("../fonts/funnel-display.woff2") format("woff2"); font-weight: 300 800; font-display: block; }
+@font-face { font-family: "Funnel Sans"; src: url("../fonts/funnel-sans.woff2") format("woff2"); font-weight: 300 800; font-display: block; }
+:root {
+  --bg: oklch(1 0 0);
+  --tint: oklch(0.975 0.008 250);
+  --ink: oklch(0.21 0.04 258);
+  --soft: oklch(0.42 0.035 255);
+  --mute: oklch(0.56 0.03 255);
+  --line: oklch(0.90 0.012 250);
+  --pipe: oklch(0.82 0.02 250);
+  --blue: oklch(0.52 0.17 252);
+  --blue-2: oklch(0.72 0.11 245);
+  --blue-wash: oklch(0.95 0.03 250);
+  --tx-no: oklch(0.93 0.012 250);
+  --low: oklch(0.63 0.19 42);
+  --leak: oklch(0.52 0.20 25);
+  --ok: oklch(0.50 0.13 150);
+  --ui: "Funnel Sans", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --disp: "Funnel Display", "Funnel Sans", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--ui); -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; background: none; border: 0; }
+.num { font-family: var(--disp); font-weight: 800; letter-spacing: -0.03em; }
+.logo { display: flex; align-items: center; gap: 9px; font: 700 18px/1 var(--disp); letter-spacing: -0.02em; }
+.logo svg { width: 22px; height: 22px; }

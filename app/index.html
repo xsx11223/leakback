@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeakBack</title>
+<link rel="stylesheet" href="../mocks/base.css">
+<style>
+body { overflow: hidden; background: var(--tint); }
+.app { display: grid; grid-template-rows: 58px minmax(0, 1fr); height: 100vh; }
+header { display: flex; align-items: center; gap: 22px; padding: 0 20px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 4px; margin-left: 10px; }
+.tabs button { padding: 7px 14px; border-radius: 8px; font-weight: 600; font-size: 14.5px; color: var(--soft); cursor: pointer; }
+.tabs button[aria-selected=true] { background: var(--blue-wash); color: var(--blue); }
+.hr { margin-left: auto; display: flex; align-items: center; gap: 18px; font-size: 14px; color: var(--soft); font-weight: 600; }
+.hr b { color: var(--ink); }
+.ok { display: flex; align-items: center; gap: 7px; } .ok i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.seg { display: flex; padding: 3px; border-radius: 8px; background: var(--tint); border: 1px solid var(--line); }
+.seg button { padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--soft); cursor: pointer; }
+.seg button[aria-pressed=true] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 2px oklch(0.21 0.04 258 / .12); }
+.view { display: none; min-height: 0; } .view.on { display: grid; }
+/* monitor */
+#v-mon { grid-template-columns: 300px minmax(0, 1fr) 380px; }
+.inbox { background: var(--bg); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.ib-h { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 18px 10px; }
+.ib-h b { font: 700 18px var(--disp); } .ib-h span { color: var(--mute); font-size: 13px; font-weight: 600; }
+.chips { display: flex; gap: 6px; padding: 0 18px 12px; border-bottom: 1px solid var(--line); }
+.chips button { padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--soft); background: var(--tint); cursor: pointer; }
+.chips button[aria-pressed=true] { background: var(--ink); color: #fff; }
+.items { overflow-y: auto; min-height: 0; scrollbar-width: thin; }
+.it { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; width: 100%; text-align: left; padding: 13px 18px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.it:hover { background: var(--tint); }
+.it.sel { background: var(--blue-wash); box-shadow: inset 3px 0 0 var(--blue); }
+.it b { font-weight: 700; font-size: 14.5px; } .it .d { color: var(--mute); font-size: 13px; text-align: right; }
+.it .m { grid-column: 1 / -1; color: var(--soft); font-size: 13.5px; }
+.st { justify-self: start; grid-column: 1 / -1; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+.st.new { background: oklch(0.95 0.05 45); color: oklch(0.50 0.17 40); } .st.go { background: var(--blue-wash); color: var(--blue); } .st.done { background: oklch(0.95 0.04 150); color: var(--ok); }
+.empty { padding: 30px 18px; color: var(--mute); font-weight: 600; }
+.center { position: relative; min-height: 0; }
+#map { position: absolute; inset: 16px 16px 92px; width: calc(100% - 32px); height: calc(100% - 108px); }
+.mapbar { position: absolute; left: 20px; top: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+.mapbar span, .mapbar label { padding: 6px 12px; border-radius: 8px; background: var(--bg); box-shadow: 0 0 0 1px var(--line); font-size: 13.5px; font-weight: 600; color: var(--soft); display: flex; gap: 8px; align-items: center; }
+.mapbar i { width: 10px; height: 10px; border-radius: 50%; }
+.mapbar label { cursor: pointer; } .mapbar input { accent-color: var(--leak); }
+.time { position: absolute; left: 16px; right: 16px; bottom: 16px; height: 62px; border-radius: 12px; background: var(--bg); box-shadow: 0 0 0 1px var(--line); display: grid; grid-template-columns: 56px 1fr; align-items: center; }
+.pl { width: 38px; height: 38px; margin-left: 12px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; cursor: pointer; }
+#tl { width: 100%; height: 100%; cursor: pointer; }
+.detail { background: var(--bg); border-left: 1px solid var(--line); padding: 22px; display: flex; flex-direction: column; gap: 18px; min-height: 0; overflow-y: auto; }
+.dt-k { display: flex; gap: 8px; align-items: center; font-weight: 700; font-size: 13.5px; }
+.dt-k i { width: 9px; height: 9px; border-radius: 50%; }
+.detail h2 { margin-top: 6px; font: 800 30px/1.1 var(--disp); letter-spacing: -0.02em; }
+.detail .sub { color: var(--mute); font-size: 14px; margin-top: 4px; }
+.mets { display: grid; grid-template-columns: repeat(3, 1fr); border-block: 1px solid var(--line); }
+.mets div { padding: 14px 0; } .mets div + div { padding-left: 14px; border-left: 1px solid var(--line); }
+.mets b { display: block; font: 800 24px/1 var(--disp); letter-spacing: -0.02em; } .mets span { font-size: 12.5px; color: var(--soft); font-weight: 600; }
+.ev h3 { font: 700 15px var(--disp); margin-bottom: 8px; }
+#ev { width: 100%; height: 150px; display: block; }
+.evl { display: flex; gap: 14px; font-size: 12.5px; color: var(--soft); font-weight: 600; margin-top: 6px; flex-wrap: wrap; }
+.evl span { display: flex; gap: 6px; align-items: center; } .evl i { width: 14px; height: 3px; border-radius: 2px; }
+.acts { margin-top: auto; display: grid; gap: 10px; }
+.truth { display: flex; justify-content: space-between; padding: 12px 14px; border-radius: 10px; background: oklch(0.97 0.02 30); font-size: 13.5px; font-weight: 600; color: var(--leak); }
+.btn { height: 46px; border-radius: 10px; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: filter .15s; }
+.btn:hover { filter: brightness(1.06); }
+.btn.p { background: var(--blue); color: #fff; } .btn.s { background: var(--tint); box-shadow: inset 0 0 0 1px var(--line); }
+/* evaluation */
+#v-eval { grid-template-columns: minmax(0, 1fr) 380px; }
+.eval-main { padding: 26px 30px 20px 36px; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.eval-main h2, .ctx h2 { font: 800 28px/1.15 var(--disp); letter-spacing: -0.02em; }
+.eval-main h2 em, .ctx h2 em { font-style: normal; color: var(--blue); }
+#tlc { width: 100%; height: 100%; }
+.eval-side { background: var(--bg); border-left: 1px solid var(--line); padding: 26px 26px; display: flex; flex-direction: column; gap: 22px; overflow-y: auto; }
+.big b { display: block; font: 800 42px/1 var(--disp); letter-spacing: -0.03em; color: var(--blue); } .big span { font-size: 13.5px; color: var(--soft); font-weight: 600; }
+.bars { display: grid; gap: 12px; }
+.br { display: grid; grid-template-columns: 7.5em 1fr 4.6em; gap: 10px; align-items: center; font-size: 13.5px; font-weight: 600; }
+.br .tr { height: 10px; border-radius: 5px; background: var(--tint); overflow: hidden; } .br .tr i { display: block; height: 100%; border-radius: 5px; background: var(--ink); }
+.br.us { color: var(--blue); } .br.us .tr i { background: var(--blue); } .br.bs .tr i { background: oklch(0.80 0.02 250); }
+.br b { font-family: var(--disp); text-align: right; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tbl th { text-align: left; color: var(--mute); font-weight: 600; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.tbl td { padding: 7px 0; border-bottom: 1px solid var(--line); } .tbl td:not(:first-child), .tbl th:not(:first-child) { text-align: right; }
+.tbl tr.us td { color: var(--blue); font-weight: 700; }
+.lims h3 { font: 700 15px var(--disp); margin-bottom: 8px; } .lims ul { padding-left: 1.1em; display: grid; gap: 6px; color: var(--soft); font-size: 13.5px; }
+/* context */
+#v-ctx { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.ctx { padding: 30px 36px; display: flex; flex-direction: column; gap: 20px; min-height: 0; }
+.ctx + .ctx { background: var(--bg); border-left: 1px solid var(--line); }
+.nums { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.nums b { display: block; font: 800 44px/1 var(--disp); letter-spacing: -0.035em; } .nums span { font-size: 13.5px; color: var(--soft); font-weight: 600; }
+.nums .bl b { color: var(--blue); }
+#tx { width: 100%; flex: 1; min-height: 0; }
+.steps { display: grid; gap: 16px; }
+.steps div { display: grid; grid-template-columns: 34px 1fr; gap: 2px 14px; }
+.steps i { grid-row: span 2; font-style: normal; width: 34px; height: 34px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; font: 800 15px var(--disp); }
+.steps b { font: 700 18px var(--disp); } .steps span { color: var(--soft); font-size: 14.5px; }
+#tip { position: fixed; z-index: 30; pointer-events: none; padding: 6px 9px; border-radius: 6px; background: var(--ink); color: #fff; font-size: 12.5px; opacity: 0; }
+#tip.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 2.5c3.6 4.6 6.5 8.4 6.5 12a6.5 6.5 0 0 1-13 0c0-3.6 2.9-7.4 6.5-12Z" fill="var(--blue)"/><path d="M8.5 14.5h7" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>LeakBack</div>
+    <a href="../lab/" style="font-weight:600;font-size:13px;color:var(--blue);text-decoration:none;padding:6px 10px;border-radius:8px;background:var(--blue-wash,oklch(0.95 0.03 250))">← Live twin</a>
+    <div class="tabs" role="tablist"><button role="tab" data-v="mon" aria-selected="true" data-t="tab_mon"></button><button role="tab" data-v="eval" aria-selected="false" data-t="tab_eval"></button><button role="tab" data-v="ctx" aria-selected="false" data-t="tab_ctx"></button></div>
+    <div class="hr"><span><span data-t="utility"></span> <b>L-Town</b></span><span class="ok"><i></i><span data-t="online"></span></span><b id="hd"></b>
+      <div class="seg" role="group" aria-label="Language"><button data-lang="en" aria-pressed="true">EN</button><button data-lang="zh" aria-pressed="false">中文</button></div></div>
+  </header>
+
+  <section class="view on" id="v-mon">
+    <aside class="inbox"><div class="ib-h"><b data-t="alarms"></b><span id="cnt"></span></div>
+      <div class="chips" id="chips"><button data-f="all" aria-pressed="true" data-t="f_all"></button><button data-f="new" aria-pressed="false" data-t="f_new"></button><button data-f="go" aria-pressed="false" data-t="f_go"></button><button data-f="done" aria-pressed="false" data-t="f_done"></button></div>
+      <div class="items" id="items"></div></aside>
+    <main class="center"><svg id="map" role="img"></svg>
+      <div class="mapbar"><span><i style="background:var(--low)"></i><span data-t="k_low"></span></span><span><i style="border:2.5px solid var(--blue);width:12px;height:12px"></i><span data-t="k_ai"></span></span><span><i style="background:oklch(0.52 0.17 252 / .3);border-radius:3px;width:20px;height:7px"></i><span data-t="k_area"></span></span><label><input type="checkbox" id="reveal"><span data-t="k_truth"></span></label></div>
+      <div class="time"><button class="pl" id="play" aria-label="Play"><svg viewBox="0 0 16 16" width="14" height="14"><path id="pi" d="M4 2.5v11l9-5.5z" fill="#fff"/></svg></button><svg id="tl"></svg></div></main>
+    <aside class="detail" id="detail"></aside>
+  </section>
+
+  <section class="view" id="v-eval">
+    <div class="eval-main"><h2 id="ev-h"></h2><svg id="tlc"></svg></div>
+    <aside class="eval-side" id="ev-side"></aside>
+  </section>
+
+  <section class="view" id="v-ctx">
+    <div class="ctx"><h2 id="cx-h"></h2><div class="nums" id="cx-n"></div><svg id="tx"></svg></div>
+    <div class="ctx"><h2 data-t="how_h"></h2><div class="steps" id="steps"></div><div class="lims" style="margin-top:auto"><h3 data-t="src_h"></h3><ul id="srcs"></ul></div></div>
+  </section>
+</div>
+<div id="tip"></div>
+<script src="../data.js"></script><script src="../console/data.js"></script><script src="../site/results.js"></script><script src="../mocks/kit.js"></script>
+<script>
+const K = window.KIT, NS = 'http://www.w3.org/2000/svg';
+const T = {
+  en: { tab_mon: 'Monitor', tab_eval: 'Evaluation', tab_ctx: 'Context', utility: 'Utility', online: '33 pressure sensors online', alarms: 'Alarms',
+    f_all: 'All', f_new: 'New', f_go: 'Dispatched', f_done: 'Repaired', k_low: 'Low pressure', k_ai: 'AI estimate', k_area: 'Search area', k_truth: 'Show true leaks',
+    none: 'No alarms in this view', susp: (p) => `Suspected ${p}`, area: (km) => `search ${km} km`, trig: 'triggered by', st: { new: 'New', go: 'Dispatched', done: 'Repaired' },
+    near: (n) => `near node ${n}`, m1: 'km search area', m2: 'candidate nodes', m3: 'sensors alarmed', ev_h: 'Evidence: pressure deviation, last 14 days', normal: 'normal band',
+    truth: 'True leak', apart: (m) => `${m} m apart`, wo: 'Generate work order', fix: 'Mark as repaired', idle: 'Select an alarm',
+    date: (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+    eval_h: (n, m) => `2019 test year: <em>${n} of ${m}</em> new leaks found`, lg1: 'Found (band width = leak flow)', lg2: 'Missed', lg3: 'Alarm', lg4: 'False alarm',
+    score: 'Official BattLeDIM score', perfect: 'Perfect', winner: '2020 winner', us: 'LeakBack', classic: 'Classic method',
+    tbl: ['Method', '2018', '2019', 'Found', 'False'], m_names: { B0_nominal_cosine: 'Classic', B1_dr_cosine: 'Classic + DR', M0_nominal_mlp: 'Neural net', M1_dr_mlp: 'Neural net + DR (ours)' },
+    abl: 'Ablation (DR = domain randomisation)', lim_h: 'Limitations',
+    lims: (c) => [`Slow alarms: median delay about a month`, `Search area covers ${c[0]}/${c[1]} real leaks (93% in simulation)`, 'Classic method scored slightly higher in 2019', 'Benchmark town, not a real Texas utility'],
+    ctx_h: (r) => `Texas leaks <em>${r}×</em> the water its data centers use`, n1: 'bn gal / yr fixable pipe leaks', n2: 'bn gal / yr data center use', unit: 1,
+    how_h: 'How LeakBack works', steps: [['Read existing sensors', '33 pressure sensors, a reading every 5 minutes. No new hardware.'], ['Raise an alarm', 'Learns each sensor’s normal level; a sustained drop raises an alarm.'], ['Locate the leak', 'A model trained on 44,000 simulated leaks points to a pipe and a search area.'], ['Prove it', 'Scored on real 2019 data with the official BattLeDIM rules.']],
+    src_h: 'Data', srcs: ['BattLeDIM 2020 dataset (Zenodo 4017659, CC BY 4.0) and official scoring', 'Texas Water Development Board water loss audits 2020–2024 (2,251 utilities)', 'HARC 2026 estimate of Texas data center water use (2025)'],
+    months: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] },
+  zh: { tab_mon: '监控', tab_eval: '效果评估', tab_ctx: '背景', utility: '水司', online: '33 个压力表在线', alarms: '报警',
+    f_all: '全部', f_new: '待处理', f_go: '已派工', f_done: '已修复', k_low: '压力偏低', k_ai: 'AI 判断', k_area: '挖掘范围', k_truth: '对照真实漏点',
+    none: '没有符合条件的报警', susp: (p) => `疑似 ${p}`, area: (km) => `挖掘范围 ${km} 公里`, trig: '触发', st: { new: '待处理', go: '已派工', done: '已修复' },
+    near: (n) => `节点 ${n} 附近`, m1: '公里挖掘范围', m2: '个候选节点', m3: '个表报警', ev_h: '证据：报警前 14 天的压力偏离', normal: '正常范围',
+    truth: '真实漏点', apart: (m) => `相距 ${m} 米`, wo: '生成派工单', fix: '标记已修复', idle: '选择一条报警',
+    date: (d) => `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`,
+    eval_h: (n, m) => `2019 测试年：${m} 处新漏损，<em>找到 ${n} 处</em>`, lg1: '找到（色带宽 = 漏水量）', lg2: '未找到', lg3: '报警', lg4: '误报',
+    score: '官方评分（BattLeDIM 规则）', perfect: '满分', winner: '2020 冠军', us: 'LeakBack', classic: '经典方法',
+    tbl: ['方法', '2018', '2019', '找到', '误报'], m_names: { B0_nominal_cosine: '经典方法', B1_dr_cosine: '经典 + 随机化', M0_nominal_mlp: '神经网络', M1_dr_mlp: '神经网络 + 随机化（本作品）' },
+    abl: '消融对比（随机化 = 领域随机化）', lim_h: '局限',
+    lims: (c) => ['报警偏慢，中位延迟约一个月', `挖掘范围真实覆盖 ${c[0]}/${c[1]}（仿真中 93%）`, '2019 年经典方法得分略高', '基准是虚构小镇，非德州真实水司'],
+    ctx_h: (r) => `德州漏掉的水，是数据中心用水的 <em>${r} 倍</em>`, n1: '亿加仑/年 可修回漏损', n2: '亿加仑/年 数据中心用水', unit: 10,
+    how_h: 'LeakBack 怎么工作', steps: [['读现有压力表', '33 个压力表，每 5 分钟一个读数，不加新硬件'], ['发现异常就报警', '学会每个表正常时的读数，持续偏低就报警'], ['指出漏在哪', '用 4.4 万个模拟漏水场景训练，指出管段和挖掘范围'], ['用真实答案检验', '在 2019 年真实数据上按 BattLeDIM 官方规则评分']],
+    src_h: '数据来源', srcs: ['BattLeDIM 2020 数据集（Zenodo 4017659，CC BY 4.0）与官方评分', '德州水发展委员会水司漏损审计 2020—2024（2251 家）', 'HARC 2026 德州数据中心用水估计（2025 年）'],
+    months: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'] },
+};
+const q = new URLSearchParams(location.search);
+let lang = q.get('lang') === 'zh' ? 'zh' : 'en', view = q.get('view') || 'mon', filter = 'all', reveal = !!q.get('reveal'), timer = null;
+const first = K.alarms.find((a) => a.t.startsWith('2019-06-13'));
+let cur = q.get('i') ? +q.get('i') : first.i, selK = K.alarms.indexOf(first);
+const repaired = new Set();
+document.getElementById('reveal').checked = reveal;
+const L = () => T[lang];
+const dOf = (i) => new Date(K.t0 + i * K.STEP);
+function statusOf(a) {
+  const lk = a.loc && K.leaks.find((l) => l.id === a.loc.credited);
+  if (repaired.has(a) || (lk && lk.ei <= cur)) return 'done';
+  return cur - a.i <= 6 ? 'new' : 'go';
+}
+/* ---------- monitor ---------- */
+function drawItems() {
+  const past = K.alarms.filter((a) => a.i <= cur).reverse();
+  const shown = past.filter((a) => filter === 'all' || statusOf(a) === filter);
+  document.getElementById('cnt').textContent = past.length;
+  document.getElementById('items').innerHTML = shown.length ? shown.map((a) => { const s = statusOf(a), k = K.alarms.indexOf(a);
+    return `<button class="it ${k === selK ? 'sel' : ''}" data-k="${k}"><b>${L().susp(a.loc ? a.loc.pred : '—')}</b><span class="d">${L().date(dOf(a.i))}</span><span class="m">${a.loc ? L().area(a.loc.set_pipe_km) : ''} · ${L().trig} ${a.sensors.join(', ')}</span><span class="st ${s}">${L().st[s]}</span></button>`; }).join('') : `<div class="empty">${L().none}</div>`;
+}
+function drawMap() { const m = document.getElementById('map'); m.innerHTML = ''; K.town(m, { i: cur, reveal, aiText: '', labels: false, distText: (x) => L().apart(x) }); }
+function drawDetail() {
+  const el = document.getElementById('detail'), a = K.alarms[selK];
+  if (!a || a.i > cur) { el.innerHTML = `<div class="empty">${L().idle}</div>`; return; }
+  const s = statusOf(a), col = { new: 'var(--low)', go: 'var(--blue)', done: 'var(--ok)' }[s];
+  const lk = K.leaks.find((l) => l.id === (a.loc && a.loc.nearest_true));
+  el.innerHTML = `<div><div class="dt-k" style="color:${col}"><i style="background:${col}"></i>${L().st[s]}</div><h2>${L().susp(a.loc.pred)}</h2><div class="sub">${L().date(dOf(a.i))} · ${L().near(a.loc.pred_node)}</div></div>
+    <div class="mets"><div><b>${a.loc.set_pipe_km}</b><span>${L().m1}</span></div><div><b>${a.loc.set_nodes}</b><span>${L().m2}</span></div><div><b>${a.sensors.length}</b><span>${L().m3}</span></div></div>
+    <div class="ev"><h3>${L().ev_h}</h3><svg id="ev"></svg><div class="evl" id="evl"></div></div>
+    <div class="acts">${reveal && lk ? `<div class="truth"><span>${L().truth}</span><span>${lk.id} · ${L().apart(a.loc.dist_m)}</span></div>` : ''}<a class="btn p" href="workorder.html?k=${selK}&lang=${lang}" target="_blank" style="text-decoration:none">${L().wo}</a><button class="btn s" id="fixb">${L().fix}</button></div>`;
+  const ev = document.getElementById('ev'), EW = 336, EH = 150, from = a.i - 28, cols = ['var(--low)', 'oklch(0.70 0.15 60)', 'oklch(0.78 0.10 75)'];
+  ev.setAttribute('viewBox', `0 0 ${EW} ${EH}`);
+  const ex = (k) => 8 + k / 28 * (EW - 16), ey = (z) => 16 + (Math.max(-8, Math.min(3, z)) - 3) / -11 * (EH - 32);
+  K.mk('rect', { x: 8, y: ey(2), width: EW - 16, height: ey(-2) - ey(2), fill: 'var(--tint)' }, ev);
+  [2, -2].forEach((v) => K.mk('line', { x1: 8, x2: EW - 8, y1: ey(v), y2: ey(v), stroke: 'var(--mute)', 'stroke-dasharray': '3 4' }, ev));
+  a.sensors.slice(0, 3).forEach((sn, k) => { let p = ''; K.sensorSeries(sn, from, a.i).forEach((z, j) => { if (z == null) return; p += (p ? 'L' : 'M') + ex(j).toFixed(1) + ',' + ey(z).toFixed(1); }); K.mk('path', { d: p, fill: 'none', stroke: cols[k], 'stroke-width': 2.4 }, ev); });
+  K.mk('line', { x1: ex(28), x2: ex(28), y1: 6, y2: EH - 6, stroke: 'var(--low)', 'stroke-width': 1.5 }, ev);
+  document.getElementById('evl').innerHTML = a.sensors.slice(0, 3).map((sn, k) => `<span><i style="background:${cols[k]}"></i>${sn}</span>`).join('') + `<span><i style="border-top:2px dashed var(--mute);height:0"></i>${L().normal}</span>`;
+  document.getElementById('fixb').onclick = () => { repaired.add(a); drawAll(); };
+}
+function drawTl() {
+  const tl = document.getElementById('tl'), W = tl.clientWidth || 1000, H = 62; tl.setAttribute('viewBox', `0 0 ${W} ${H}`); tl.innerHTML = '';
+  const x = (i) => 10 + i / (K.N - 1) * (W - 20);
+  K.alarms.forEach((a) => K.mk('line', { x1: x(a.i), x2: x(a.i), y1: 12, y2: 36, stroke: a.i <= cur ? 'var(--low)' : 'var(--line)', 'stroke-width': 3 }, tl));
+  K.mk('rect', { x: 10, y: 23, width: Math.max(0, x(cur) - 10), height: 2, fill: 'var(--ink)' }, tl);
+  L().months.forEach((m, k) => { const t = K.mk('text', { x: x(Math.round(k * K.N / 12)) + 2, y: 56, fill: 'var(--mute)', style: 'font:600 11px var(--ui)' }, tl); t.textContent = m; });
+  K.mk('line', { x1: x(cur), x2: x(cur), y1: 4, y2: 44, stroke: 'var(--ink)', 'stroke-width': 2 }, tl);
+}
+/* ---------- evaluation ---------- */
+function drawEval() {
+  const found = new Set(K.alarms.filter((a) => a.loc && a.loc.official === 'TP').map((a) => a.loc.credited));
+  const rows = K.leaks.slice().sort((a, b) => a.si - b.si), nF = rows.filter((l) => found.has(l.id)).length;
+  document.getElementById('ev-h').innerHTML = L().eval_h(nF, rows.length);
+  const svg = document.getElementById('tlc'), W = 1000, H = 640, Lm = 92, Tm = 46, B = 30; svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = '';
+  const x = (i) => Lm + i / (K.N - 1) * (W - Lm - 10), rh = (H - Tm - B) / rows.length;
+  L().months.forEach((m, k) => { const xx = x(Math.round(k * K.N / 12)); K.mk('line', { x1: xx, x2: xx, y1: Tm - 6, y2: H - B, stroke: 'var(--line)' }, svg); const t = K.mk('text', { x: xx + 4, y: H - 10, fill: 'var(--mute)', style: 'font:600 12px var(--ui)' }, svg); t.textContent = m; });
+  rows.forEach((l, k) => { const y = Tm + k * rh + rh / 2, f = found.has(l.id); const t = K.mk('text', { x: Lm - 12, y: y + 4, 'text-anchor': 'end', fill: 'var(--soft)', style: 'font:600 12.5px var(--ui)' }, svg); t.textContent = l.id;
+    const fm = Math.max(...l.flow, 1); let top = '', bot = ''; for (let i = l.si; i <= l.ei; i++) { const h = (l.flow[i] || 0) / fm * rh * 0.36; top += `${i === l.si ? 'M' : 'L'}${x(i).toFixed(1)},${(y - h).toFixed(1)}`; bot = `L${x(i).toFixed(1)},${(y + h).toFixed(1)}` + bot; }
+    K.mk('path', { d: top + bot + 'Z', fill: f ? 'var(--blue)' : 'oklch(0.86 0.012 250)' }, svg); });
+  K.alarms.forEach((a) => { const lc = a.loc; if (!lc) return; if (lc.official === 'TP') { const k = rows.findIndex((l) => l.id === lc.credited); if (k < 0) return; const y = Tm + k * rh + rh / 2; K.mk('path', { d: `M${x(a.i) - 7},${y - 14}L${x(a.i) + 7},${y - 14}L${x(a.i)},${y - 3}Z`, fill: 'var(--low)' }, svg); } else if (lc.official === 'FP') K.mk('line', { x1: x(a.i), x2: x(a.i), y1: Tm - 8, y2: H - B, stroke: 'var(--low)', 'stroke-dasharray': '3 4', 'stroke-width': 1.3 }, svg); });
+  [['var(--blue)', L().lg1], ['oklch(0.86 0.012 250)', L().lg2], ['var(--low)', '▼ ' + L().lg3 + '　┆ ' + L().lg4]].forEach(([c, s], k) => { K.mk('rect', { x: Lm + k * 260, y: 10, width: 14, height: 14, rx: 3, fill: c }, svg); const t = K.mk('text', { x: Lm + k * 260 + 22, y: 22, fill: 'var(--soft)', style: 'font:600 12.5px var(--ui)' }, svg); t.textContent = s; });
+  const c = K.chosen, rr = [[L().perfect, K.R.perfect, ''], [L().winner, K.R.winner, ''], [L().us, c.total, 'us'], [L().classic, K.classic.total, 'bs']];
+  const order = ['B0_nominal_cosine', 'B1_dr_cosine', 'M0_nominal_mlp', 'M1_dr_mlp'];
+  document.getElementById('ev-side').innerHTML = `<div class="big"><b>€${K.fmt(c.total)}</b><span>${L().score}</span></div>
+    <div class="bars">${rr.map(([n, v, cl]) => `<div class="br ${cl}"><span>${n}</span><div class="tr"><i style="width:${(v / K.R.perfect * 100).toFixed(1)}%"></i></div><b>${Math.round(v / 1000)}k</b></div>`).join('')}</div>
+    <div class="lims"><h3>${L().abl}</h3><table class="tbl"><tr>${L().tbl.map((h) => `<th>${h}</th>`).join('')}</tr>${order.map((k) => { const m = K.R.methods[k]; return `<tr class="${k === K.R.chosen ? 'us' : ''}"><td>${L().m_names[k]}</td><td>€${Math.round(m.y2018 / 1000)}k</td><td>€${Math.round(m.total / 1000)}k</td><td>${m.TP}</td><td>${m.FP}</td></tr>`; }).join('')}</table></div>
+    <div class="lims"><h3>${L().lim_h}</h3><ul>${L().lims(K.R.cover.real).map((x) => `<li>${x}</li>`).join('')}</ul></div>`;
+}
+/* ---------- context ---------- */
+function drawCtx() {
+  const r = (K.fixBG / K.useBG).toFixed(1); document.getElementById('cx-h').innerHTML = L().ctx_h(r);
+  document.getElementById('cx-n').innerHTML = `<div class="bl"><b>${K.fmt(K.fixBG * L().unit)}</b><span>${L().n1}</span></div><div><b>${K.fmt(K.useBG * L().unit)}</b><span>${L().n2}</span></div>`;
+  const tx = document.getElementById('tx'); tx.innerHTML = ''; K.texas(tx);
+  document.getElementById('steps').innerHTML = L().steps.map(([b, s], k) => `<div><i>${k + 1}</i><b>${b}</b><span>${s}</span></div>`).join('');
+  document.getElementById('srcs').innerHTML = L().srcs.map((x) => `<li>${x}</li>`).join('');
+}
+function drawAll() {
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  document.querySelectorAll('[data-t]').forEach((n) => { const v = L()[n.dataset.t]; if (typeof v === 'string') n.textContent = v; });
+  document.querySelectorAll('[data-lang]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.lang === lang));
+  document.querySelectorAll('[data-v]').forEach((b) => b.setAttribute('aria-selected', b.dataset.v === view));
+  document.querySelectorAll('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + view));
+  document.querySelectorAll('[data-f]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.f === filter));
+  document.getElementById('hd').textContent = L().date(dOf(cur));
+  if (view === 'mon') { drawItems(); drawMap(); drawDetail(); drawTl(); }
+  if (view === 'eval') drawEval();
+  if (view === 'ctx') drawCtx();
+}
+document.querySelectorAll('[data-v]').forEach((b) => b.onclick = () => { view = b.dataset.v; drawAll(); });
+document.querySelectorAll('[data-lang]').forEach((b) => b.onclick = () => { lang = b.dataset.lang; drawAll(); });
+document.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => { filter = b.dataset.f; drawAll(); });
+document.getElementById('items').onclick = (e) => { const b = e.target.closest('[data-k]'); if (b) { selK = +b.dataset.k; drawAll(); } };
+document.getElementById('reveal').onchange = (e) => { reveal = e.target.checked; drawAll(); };
+const tlEl = document.getElementById('tl'); let drag = false;
+const seek = (e) => { const r = tlEl.getBoundingClientRect(); cur = Math.max(0, Math.min(K.N - 1, Math.round((e.clientX - r.left - 10) / (r.width - 20) * (K.N - 1)))); const last = K.alarms.filter((a) => a.i <= cur).pop(); if (last) selK = K.alarms.indexOf(last); drawAll(); };
+tlEl.onpointerdown = (e) => { drag = true; tlEl.setPointerCapture(e.pointerId); stop(); seek(e); }; tlEl.onpointermove = (e) => drag && seek(e); tlEl.onpointerup = () => { drag = false; };
+function stop() { clearInterval(timer); timer = null; document.getElementById('pi').setAttribute('d', 'M4 2.5v11l9-5.5z'); }
+function play() { if (cur >= K.N - 1) cur = 0; timer = setInterval(() => { if (cur >= K.N - 1) return stop(); cur++; const a = K.alarms.find((x) => x.i === cur); if (a) selK = K.alarms.indexOf(a); drawAll(); }, 60); document.getElementById('pi').setAttribute('d', 'M4 2.5h3v11H4zM9 2.5h3v11H9z'); }
+document.getElementById('play').onclick = () => (timer ? stop() : play());
+addEventListener('resize', drawAll);
+drawAll();
+</script>
+</body>
+</html>

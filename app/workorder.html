@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeakBack · Work order</title>
+<link rel="stylesheet" href="../mocks/base.css">
+<style>
+body { background: oklch(0.94 0.008 250); }
+.sheet { width: 210mm; min-height: 297mm; margin: 24px auto; background: #fff; padding: 18mm 18mm 16mm; box-shadow: 0 2px 20px oklch(0.21 0.04 258 / .12); display: flex; flex-direction: column; gap: 9mm; }
+.hd { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--ink); padding-bottom: 5mm; }
+.hd h1 { font: 800 26px/1.1 var(--disp); letter-spacing: -0.02em; margin-top: 8px; }
+.hd .no { text-align: right; font-size: 13px; color: var(--soft); line-height: 1.6; }
+.hd .no b { color: var(--ink); font: 700 16px var(--disp); }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 8px; }
+.grid div { padding: 10px 12px; } .grid div + div { border-left: 1px solid var(--line); }
+.grid span { display: block; font-size: 12px; color: var(--mute); font-weight: 600; }
+.grid b { font: 800 19px var(--disp); }
+h2 { font: 700 15px var(--disp); margin-bottom: 3mm; }
+#zoom { width: 100%; height: 95mm; border: 1px solid var(--line); border-radius: 8px; }
+.pipes { columns: 6; font-size: 12.5px; color: var(--soft); }
+#ev { width: 100%; height: 38mm; }
+.sig { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10mm; font-size: 12.5px; color: var(--soft); }
+.sig div { border-top: 1px solid var(--ink); padding-top: 2mm; }
+.bar { width: 210mm; margin: 0 auto; display: flex; justify-content: flex-end; }
+.bar button { padding: 8px 16px; border-radius: 8px; background: var(--blue); color: #fff; font-weight: 700; cursor: pointer; }
+@media print { body { background: #fff; } .sheet { margin: 0; box-shadow: none; } .bar { display: none; } }
+</style>
+</head>
+<body>
+<div class="bar" style="margin-top:16px"><button onclick="print()" id="pb">Print</button></div>
+<div class="sheet">
+  <div class="hd"><div><div class="logo"><svg viewBox="0 0 24 24"><path d="M12 2.5c3.6 4.6 6.5 8.4 6.5 12a6.5 6.5 0 0 1-13 0c0-3.6 2.9-7.4 6.5-12Z" fill="var(--blue)"/><path d="M8.5 14.5h7" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>LeakBack</div><h1 id="h1"></h1></div><div class="no" id="no"></div></div>
+  <div class="grid" id="grid"></div>
+  <div><h2 id="h-map"></h2><svg id="zoom"></svg></div>
+  <div><h2 id="h-pipes"></h2><div class="pipes" id="pipes"></div></div>
+  <div><h2 id="h-ev"></h2><svg id="ev"></svg></div>
+  <div class="sig" id="sig"></div>
+</div>
+<script src="../data.js"></script><script src="../console/data.js"></script><script src="../site/results.js"></script><script src="../mocks/kit.js"></script>
+<script>
+const K = window.KIT, q = new URLSearchParams(location.search), zh = q.get('lang') === 'zh';
+const a = K.alarms[+(q.get('k') || 0)], lc = a.loc, d = new Date(K.t0 + a.i * K.STEP);
+const t = zh ? { h1: '漏损巡查派工单', no: '工单号', date: '报警时间', pipe: '疑似管段', area: '挖掘范围', nodes: '候选节点', sens: '报警压力表', map: '挖掘范围（蓝色管段），圆圈为 AI 判断位置', pipes: '需巡查的管段', ev: '证据：报警前 14 天压力偏离（标准化）', sig: ['派工人', '巡查人', '完成日期'], print: '打印', km: '公里' }
+  : { h1: 'Leak inspection work order', no: 'Work order', date: 'Alarm time', pipe: 'Suspected pipe', area: 'Search area', nodes: 'Candidate nodes', sens: 'Alarming sensors', map: 'Search area (blue pipes); ring = AI estimate', pipes: 'Pipes to inspect', ev: 'Evidence: pressure deviation over 14 days (standardised)', sig: ['Dispatched by', 'Inspected by', 'Completed on'], print: 'Print', km: 'km' };
+document.documentElement.lang = zh ? 'zh-CN' : 'en';
+document.getElementById('pb').textContent = t.print;
+document.getElementById('h1').textContent = t.h1;
+const ds = zh ? `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()} ${d.getHours() ? '12:00' : '00:00'}` : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + (d.getHours() ? ' 12:00' : ' 00:00');
+document.getElementById('no').innerHTML = `${t.no}<br><b>LT-${a.t.slice(0, 10).replace(/-/g, '')}-${lc.pred}</b><br>L-Town`;
+document.getElementById('grid').innerHTML = `<div><span>${t.date}</span><b>${ds}</b></div><div><span>${t.pipe}</span><b>${lc.pred}</b></div><div><span>${t.area}</span><b>${lc.set_pipe_km} ${t.km}</b></div><div><span>${t.sens}</span><b>${a.sensors.join(', ')}</b></div>`;
+document.getElementById('h-map').textContent = t.map; document.getElementById('h-pipes').textContent = t.pipes + ` (${lc.set_pipes.length})`; document.getElementById('h-ev').textContent = t.ev;
+const z = document.getElementById('zoom'); K.town(z, { i: a.i, reveal: false, labels: false });
+const pts = lc.set_pipes.map((id) => K.LT.pipes.find((p) => p.id === id)).filter(Boolean).flatMap((p) => p.p);
+const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]), pad = 90;
+const x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad, y0 = Math.min(...ys) - pad, y1 = Math.max(...ys) + pad;
+z.setAttribute('viewBox', `${x0} ${y0} ${x1 - x0} ${y1 - y0}`);
+document.getElementById('pipes').innerHTML = lc.set_pipes.map((p) => `<div>${p === lc.pred ? '<b style="color:var(--blue)">' + p + '</b>' : p}</div>`).join('');
+const ev = document.getElementById('ev'), EW = 600, EH = 130, from = a.i - 28, cols = ['var(--low)', 'oklch(0.70 0.15 60)', 'oklch(0.78 0.10 75)'];
+ev.setAttribute('viewBox', `0 0 ${EW} ${EH}`); ev.setAttribute('preserveAspectRatio', 'none');
+const ex = (k) => 8 + k / 28 * (EW - 16), ey = (v) => 10 + (Math.max(-8, Math.min(3, v)) - 3) / -11 * (EH - 20);
+K.mk('rect', { x: 8, y: ey(2), width: EW - 16, height: ey(-2) - ey(2), fill: 'var(--tint)' }, ev);
+a.sensors.slice(0, 3).forEach((s, k) => { let p = ''; K.sensorSeries(s, from, a.i).forEach((v, j) => { if (v == null) return; p += (p ? 'L' : 'M') + ex(j).toFixed(1) + ',' + ey(v).toFixed(1); }); K.mk('path', { d: p, fill: 'none', stroke: cols[k], 'stroke-width': 2.2, 'vector-effect': 'non-scaling-stroke' }, ev); });
+document.getElementById('sig').innerHTML = t.sig.map((s) => `<div>${s}</div>`).join('');
+</script>
+</body>
+</html>

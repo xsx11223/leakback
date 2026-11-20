@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeakBack Live Lab</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%231e5bd8'/%3E%3Cpath d='M12 4c2.8 3.6 5 6.5 5 9.3a5 5 0 0 1-10 0C7 10.5 9.2 7.6 12 4Z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+@font-face { font-family: "Funnel Display"; src: url(../fonts/funnel-display.woff2) format("woff2"); font-weight: 300 800; }
+@font-face { font-family: "Funnel Sans"; src: url(../fonts/funnel-sans.woff2) format("woff2"); font-weight: 300 800; }
+:root {
+  --bg: oklch(1 0 0); --tint: oklch(0.975 0.008 250); --ink: oklch(0.21 0.04 258); --soft: oklch(0.42 0.035 255);
+  --mute: oklch(0.58 0.03 255); --line: oklch(0.91 0.012 250); --pipe: oklch(0.85 0.016 250);
+  --blue: oklch(0.52 0.17 252); --blue-wash: oklch(0.95 0.03 250); --low: oklch(0.66 0.18 50); --leak: oklch(0.55 0.21 27); --ok: oklch(0.52 0.13 150); --gray: oklch(0.55 0.02 255);
+  --ui: "Funnel Sans", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif; --disp: "Funnel Display", "Funnel Sans", "Microsoft YaHei UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.4 var(--ui); }
+body { display: grid; grid-template-rows: 56px 1fr; overflow: hidden; }
+header { display: flex; align-items: center; gap: 22px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 9px; font: 700 18px var(--disp); letter-spacing: -0.02em; }
+.brand i { width: 26px; height: 26px; border-radius: 7px; background: var(--blue); display: grid; place-items: center; }
+nav { display: flex; gap: 4px; }
+nav a { font-weight: 600; font-size: 13px; color: var(--soft); text-decoration: none; padding: 7px 12px; border-radius: 8px; }
+nav a.on { background: var(--blue-wash); color: var(--blue); }
+nav a:not(.on):hover { background: var(--tint); }
+.engine { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mute); }
+.dot.on { background: var(--ok); box-shadow: 0 0 0 4px oklch(0.52 0.13 150 / 0.15); }
+header .sp { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
+.seg button { border: 0; background: none; font: 600 12px var(--ui); color: var(--soft); padding: 5px 10px; border-radius: 6px; cursor: pointer; }
+.seg button.on { background: var(--ink); color: #fff; }
+main { display: grid; grid-template-columns: 1fr 400px; min-height: 0; }
+#mapWrap { position: relative; background: var(--tint); min-height: 0; }
+#map { width: 100%; height: 100%; display: block; cursor: crosshair; }
+#map line { stroke: var(--pipe); stroke-linecap: round; transition: stroke 0.45s, stroke-width 0.45s; }
+#map line:hover { stroke: var(--blue); stroke-width: 18; }
+#map .sen { fill: #fff; stroke: var(--ink); stroke-width: 3; pointer-events: none; transition: fill 0.45s; }
+#map .set { fill: oklch(0.52 0.17 252 / 0.13); pointer-events: none; }
+#map .ai { fill: none; stroke: var(--blue); stroke-width: 9; pointer-events: none; }
+#map .m0 { fill: none; stroke: var(--gray); stroke-width: 7; stroke-dasharray: 16 11; pointer-events: none; }
+#map .true { fill: var(--leak); stroke: #fff; stroke-width: 6; pointer-events: none; }
+#map .pulse { fill: none; stroke: var(--leak); stroke-width: 4; pointer-events: none; animation: pulse 1.8s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes pulse { from { opacity: .7; transform: scale(1); } to { opacity: 0; transform: scale(3.2); } }
+body.cap #map line, body.cap #map .sen, body.cap .sw, body.cap .sw::after { transition: none !important; } body.cap #map .pulse { display: none; }
+.legend { position: absolute; left: 18px; bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 12px; color: var(--soft); background: oklch(1 0 0 / 0.9); padding: 9px 13px; border-radius: 10px; max-width: calc(100% - 36px); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ramp { width: 90px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--pipe), oklch(0.80 0.12 70), var(--low), var(--leak)); }
+.sw-true { width: 11px; height: 11px; border-radius: 50%; background: var(--leak); }
+.sw-ai { width: 13px; height: 13px; border-radius: 50%; border: 3px solid var(--blue); }
+.sw-m0 { width: 13px; height: 13px; border-radius: 50%; border: 2px dashed var(--gray); }
+.sw-set { width: 13px; height: 13px; border-radius: 50%; background: oklch(0.52 0.17 252 / 0.25); }
+.hint { position: absolute; left: 50%; top: 22px; transform: translateX(-50%); background: var(--ink); color: #fff; font-weight: 600; padding: 9px 16px; border-radius: 999px; font-size: 13px; pointer-events: none; white-space: nowrap; }
+aside { border-left: 1px solid var(--line); overflow-y: auto; }
+section { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+h2 { font: 700 11px var(--ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--mute); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+h2 b { color: var(--ink); letter-spacing: 0; text-transform: none; font-size: 13px; }
+.row { display: grid; grid-template-columns: 96px 1fr 62px; align-items: center; gap: 10px; margin: 7px 0; font-size: 13px; color: var(--soft); }
+.row output { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
+input[type=range] { width: 100%; accent-color: var(--blue); }
+.kpis { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.kpi .v { font: 700 24px/1 var(--disp); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kpi .v small { font: 600 12px var(--ui); color: var(--mute); margin-left: 2px; }
+.kpi .l { font-size: 11.5px; color: var(--mute); margin-top: 5px; }
+.big { width: 100%; border: 0; border-radius: 10px; background: var(--blue); color: #fff; font: 700 15px var(--ui); padding: 13px; cursor: pointer; }
+.big:disabled { background: var(--line); color: var(--mute); cursor: default; }
+.ghost { width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font: 600 13px var(--ui); padding: 10px; cursor: pointer; }
+.ghost:disabled { color: var(--mute); cursor: default; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--soft); margin-top: 10px; }
+.sw { position: relative; flex: none; width: 38px; height: 22px; border-radius: 11px; background: var(--line); border: 0; cursor: pointer; transition: background .2s; }
+.sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .2s; }
+.sw.on { background: var(--blue); } .sw.on::after { left: 19px; }
+#bars { width: 100%; height: 92px; display: block; margin-top: 12px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; margin-top: 12px; }
+th { font: 600 11.5px var(--ui); color: var(--mute); text-align: right; padding: 0 0 6px; }
+th:first-child, td:first-child { text-align: left; }
+td { padding: 8px 0; border-top: 1px solid var(--line); text-align: right; font-weight: 600; font-size: 13px; }
+td .k { display: inline-flex; align-items: center; gap: 7px; }
+tr.us td { color: var(--ink); } tr.them td { color: var(--soft); }
+.tag { display: inline-block; font-weight: 700; font-size: 11.5px; padding: 2px 7px; border-radius: 6px; }
+.tag.hit { background: oklch(0.94 0.05 150); color: var(--ok); }
+.tag.miss { background: oklch(0.95 0.04 30); color: var(--leak); }
+.prog { height: 4px; background: var(--line); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+.prog i { display: block; height: 100%; width: 0; background: var(--blue); transition: width .2s; }
+.info { position: relative; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--mute); color: var(--mute); font: 700 10px var(--ui); cursor: help; text-transform: none; letter-spacing: 0; }
+.info:hover::after, .info:focus::after { content: attr(data-tip); position: absolute; right: -8px; top: 22px; width: 250px; background: var(--ink); color: #fff; font: 500 12px/1.45 var(--ui); padding: 9px 11px; border-radius: 8px; z-index: 5; text-align: left; white-space: normal; }
+.hide { display: none !important; }
+@media (max-width: 900px) { body { overflow: auto; grid-template-rows: auto 1fr; } header { flex-wrap: wrap; padding: 10px 16px; gap: 10px; } main { grid-template-columns: 1fr; } #mapWrap { height: 60vh; } .engine { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><i><svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 3c3 3.9 5.6 7.1 5.6 10.2a5.6 5.6 0 0 1-11.2 0C6.4 10.1 9 6.9 12 3Z" fill="#fff"/></svg></i>LeakBack</div>
+  <nav><a class="on" href="./" data-i="nav1">Live twin</a><a href="../app/index.html" data-i="nav2">Real 2019 data</a></nav>
+  <div class="sp"></div>
+  <div class="engine"><i class="dot" id="dot"></i><span id="eng">EPANET 2.3 · WebAssembly</span></div>
+  <div class="seg" id="lang"><button data-l="en">EN</button><button data-l="zh">中文</button></div>
+</header>
+<main>
+  <div id="mapWrap">
+    <svg id="map" aria-label="L-Town water network"></svg>
+    <div class="hint" id="hint">Loading…</div>
+    <div class="legend">
+      <span><span data-i="lg">Pressure drop</span><i class="ramp"></i></span>
+      <span><i class="sw-true"></i><span data-i="lgT">True leak</span></span>
+      <span><i class="sw-ai"></i>LeakBack</span>
+      <span><i class="sw-m0"></i><span data-i="lgM0">Standard model</span></span>
+      <span><i class="sw-set"></i><span data-i="lgS">Search area</span></span>
+    </div>
+  </div>
+  <aside>
+    <section>
+      <h2><span data-i="scene">Scenario</span><span class="info" tabindex="0" id="tipScene" data-tip=""></span></h2>
+      <div class="row"><span data-i="hour">Time of day</span><input id="hr" type="range" min="0" max="23" value="3" aria-label="hour"><output id="hrO">03:00</output></div>
+      <div class="row"><span data-i="size">Hole size</span><input id="dm" type="range" min="8" max="25" value="16" aria-label="hole"><output id="dmO">16 mm</output></div>
+      <div class="row"><span data-i="noise">Sensor noise</span><input id="nz" type="range" min="0" max="5" step="0.5" value="0" aria-label="noise"><output id="nzO">0 cm</output></div>
+      <div class="toggle"><span data-i="dr">Real network differs from the model (±10%)</span><button class="sw" id="dr" aria-label="model error"></button></div>
+    </section>
+    <section>
+      <h2><span data-i="leak">Leak</span><b id="leakId">—</b></h2>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="kQ">—</div><div class="l" data-i="kq">Leak flow, m³/h</div></div>
+        <div class="kpi"><div class="v" id="kY">—</div><div class="l" id="kYl">Lost per year</div></div>
+        <div class="kpi"><div class="v" id="kD">—</div><div class="l" data-i="kd">Max drop, m</div></div>
+      </div>
+      <svg id="bars" aria-label="33 sensors"></svg>
+    </section>
+    <section>
+      <button class="big" id="find" disabled data-i="find">Locate with AI</button>
+      <table id="res" class="hide">
+        <thead><tr><th></th><th data-i="cErr">Error</th><th data-i="cArea">Search area</th><th></th></tr></thead>
+        <tbody>
+          <tr class="us"><td><span class="k"><i class="sw-ai"></i>LeakBack</span></td><td id="r1e"></td><td id="r1a"></td><td id="r1t"></td></tr>
+          <tr class="them"><td><span class="k"><i class="sw-m0"></i><span data-i="lgM0">Standard model</span></span></td><td id="r0e"></td><td id="r0a"></td><td id="r0t"></td></tr>
+        </tbody>
+      </table>
+    </section>
+    <section>
+      <h2><span data-i="stress">Stress test</span><span class="info" tabindex="0" id="tipStress" data-tip=""></span></h2>
+      <button class="ghost" id="stress" data-i="run50">Drop 100 random leaks</button>
+      <div class="prog"><i id="prog"></i></div>
+      <table id="st" class="hide">
+        <thead><tr><th></th><th data-i="c300">≤ 300 m</th><th data-i="cMed">Median error</th><th data-i="cCov">In area</th></tr></thead>
+        <tbody>
+          <tr class="us"><td><span class="k"><i class="sw-ai"></i>LeakBack</span></td><td id="s1a"></td><td id="s1b"></td><td id="s1c"></td></tr>
+          <tr class="them"><td><span class="k"><i class="sw-m0"></i><span data-i="lgM0">Standard model</span></span></td><td id="s0a"></td><td id="s0b"></td><td id="s0c"></td></tr>
+        </tbody>
+      </table>
+    </section>
+  </aside>
+</main>
+<script type="module">
+import { createLab } from './engine.js';
+const T = {
+  en: { nav1: 'Live twin', nav2: 'Real 2019 data', hint: 'Click any pipe to create a leak', loading: 'Loading the hydraulic engine…', lg: 'Pressure drop', lgT: 'True leak', lgM0: 'Standard model', lgS: 'Search area',
+    scene: 'Scenario', hour: 'Time of day', size: 'Hole size', noise: 'Sensor noise', dr: 'Real network differs from the model (±10%)', leak: 'Leak', kq: 'Leak flow, m³/h', kd: 'Max drop, m', year: 'Lost per year, gal',
+    find: 'Locate with AI', cErr: 'Error', cArea: 'Search area', hit: 'In area', miss: 'Missed', stress: 'Stress test', run50: 'Drop 100 random leaks', running: 'Running…', c300: '≤ 300 m', cMed: 'Median error', cCov: 'In area',
+    tipScene: 'Every change re-runs EPANET in your browser. With the switch on, the hidden "real" town gets random pipe roughness, diameter and demand errors that the AI never sees.',
+    tipStress: 'Each leak: a random junction, hole size and hour, a fresh hydraulic solve, then both models locate it from the 33 sensors only. Simulation results. Model errors hurt the standard model more; sensor noise above ~1 cm erases the gap, which is why the median error on real 2019 data was 237 m.',
+    eng: (n, ms) => `EPANET 2.3 · WebAssembly · ${n} solves in ${ms} ms` },
+  zh: { nav1: '实时孪生', nav2: '2019 真实数据', hint: '点任意一根管道，制造一个漏点', loading: '正在加载水力引擎…', lg: '压力下降', lgT: '真实漏点', lgM0: '普通模型', lgS: '挖掘范围',
+    scene: '场景', hour: '时刻', size: '漏孔直径', noise: '压力表噪声', dr: '真实管网与模型有误差（±10%）', leak: '漏点', kq: '漏水量 m³/h', kd: '最大压降 m', year: '一年漏掉 m³',
+    find: '让 AI 定位', cErr: '误差', cArea: '挖掘范围', hit: '圈住', miss: '没圈住', stress: '压力测试', run50: '随机放 100 个漏点', running: '计算中…', c300: '300 米内', cMed: '中位误差', cCov: '圈住',
+    tipScene: '每次改动都会在浏览器里重新跑一次 EPANET。打开开关后，后台的「真实小镇」管道粗糙度、管径和用水量会随机偏差，AI 看不到这些偏差。',
+    tipStress: '每个漏点：随机位置、孔径和时刻，重新水力计算，两个模型只看 33 个压力表去找。这是仿真结果。管网误差对普通模型伤害更大；压力表噪声超过约 1 厘米，两者差距就消失了，这也是 2019 年真实数据中位误差为 237 米的原因。',
+    eng: (n, ms) => `EPANET 2.3 · WebAssembly · ${n} 次计算 ${ms} 毫秒` },
+};
+const Q = new URLSearchParams(location.search);
+let L = Q.get('lang') || (navigator.language.startsWith('zh') ? 'zh' : 'en');
+const $ = (id) => document.getElementById(id);
+if (Q.has('cap')) document.body.classList.add('cap');
+function lang(l) {
+  L = l; document.documentElement.lang = l;
+  document.querySelectorAll('[data-i]').forEach((e) => (e.textContent = T[l][e.dataset.i]));
+  document.querySelectorAll('#lang button').forEach((b) => b.classList.toggle('on', b.dataset.l === l));
+  $('tipScene').dataset.tip = T[l].tipScene; $('tipStress').dataset.tip = T[l].tipStress; $('tipScene').textContent = $('tipStress').textContent = 'i';
+  $('kYl').textContent = T[l].year;
+  if (!leak) $('hint').textContent = lab ? T[l].hint : T[l].loading;
+  if (obs) kpis(); if (lastFind) showFind(lastFind); if (lastStress) showStress(lastStress);
+}
+$('lang').onclick = (e) => e.target.dataset.l && lang(e.target.dataset.l);
+let lab = null, leak = null, obs = null, lastFind = null, lastStress = null;
+lang(L);
+
+lab = await createLab('L-TOWN.inp', 'model.json');
+window.lab = lab;
+$('dot').classList.add('on'); $('hint').textContent = T[L].hint;
+
+// ---------- 地图 ----------
+const svg = $('map'), NS = 'http://www.w3.org/2000/svg';
+const mk = (tag, a, p = svg) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
+const xs = lab.nodes.map((n) => n.xy[0]), ys = lab.nodes.map((n) => n.xy[1]);
+const X0 = Math.min(...xs), X1 = Math.max(...xs), Y0 = Math.min(...ys), Y1 = Math.max(...ys), pad = 160;
+svg.setAttribute('viewBox', `${X0 - pad} ${-Y1 - pad} ${X1 - X0 + 2 * pad} ${Y1 - Y0 + 2 * pad}`);
+svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+const P = (i) => [lab.nodes[i - 1].xy[0], -lab.nodes[i - 1].xy[1]];
+const gSet = mk('g', {}), gPipe = mk('g', {}), gTop = mk('g', {});
+const pipeEl = lab.links.map((l) => { const [x1, y1] = P(l.a), [x2, y2] = P(l.b); const e = mk('line', { x1, y1, x2, y2, 'stroke-width': 10 }, gPipe); e.dataset.i = l.i; return e; });
+const senEl = lab.sensors.map((s) => { const [cx, cy] = P(s); return mk('circle', { cx, cy, r: 19, class: 'sen' }, gTop); });
+const linkOf = {}; lab.links.forEach((l) => { (linkOf[l.a] ||= []).push(l); (linkOf[l.b] ||= []).push(l); });
+
+const STOPS = [[0.85, 0.016, 250], [0.80, 0.12, 70], [0.66, 0.18, 50], [0.55, 0.21, 27]];
+function color(t) {
+  t = Math.max(0, Math.min(1, t)) ** 1.6; if (t < 0.03) return null;
+  const f = t * 3, k = Math.min(2, Math.floor(f)), u = f - k, a = STOPS[k], b = STOPS[k + 1];
+  return `oklch(${(a[0] + (b[0] - a[0]) * u).toFixed(3)} ${(a[1] + (b[1] - a[1]) * u).toFixed(3)} ${(a[2] + (b[2] - a[2]) * u).toFixed(1)})`;
+}
+function paint() {
+  const d = obs.drop, dd = lab.dist(leak.node), mx = Math.max(1e-3, ...Array.from(d).slice(1));
+  lab.links.forEach((l, k) => {
+    const c = color(Math.max(d[l.a], d[l.b]) / mx), e = pipeEl[k];
+    e.style.transitionDelay = Math.min(1.6, Math.min(dd[l.a], dd[l.b]) / 2500).toFixed(2) + 's';   // 涟漪：按管网距离依次显色
+    e.style.stroke = c || ''; e.setAttribute('stroke-width', c ? 15 : 10);
+  });
+  senEl.forEach((e, k) => { e.style.transitionDelay = Math.min(1.6, dd[lab.sensors[k]] / 2500).toFixed(2) + 's'; e.style.fill = color(d[lab.sensors[k]] / mx) || '#fff'; });
+  const b = $('bars'); b.innerHTML = ''; const W = 360, H = 92; b.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const v = lab.sensors.map((s) => d[s]), vm = Math.max(0.02, ...v), w = W / v.length;
+  v.forEach((x, k) => { const h = Math.max(1.5, x / vm * (H - 4)); mk('rect', { x: k * w + 1.5, y: H - h, width: w - 3, height: h, rx: 2, fill: color(x / mx) || 'var(--pipe)' }, b); });
+}
+const fmt = (x) => x >= 1e6 ? (x / 1e6).toFixed(1) + 'M' : x >= 1e3 ? Math.round(x / 1e3) + 'k' : Math.round(x) + '';
+function kpis() {
+  $('leakId').textContent = leak.link; $('kQ').textContent = obs.leakFlow.toFixed(1);
+  const y = obs.leakFlow * 8760; $('kY').textContent = L === 'zh' ? fmt(y) : fmt(y * 264.172);
+  $('kD').textContent = Math.max(...Array.from(obs.drop).slice(1)).toFixed(2);
+}
+function place(linkIdx) {
+  const l = lab.links[linkIdx - 1];
+  const node = [l.a, l.b].find((n) => lab.nodes[n - 1].type === 0) || l.a;
+  leak = { link: l.id, linkIdx, node }; run();
+}
+let rnd = Math.random;
+function run() {
+  if (!leak) return;
+  leak.dmm = +$('dm').value;
+  const s0 = lab.stats.solves, t = performance.now();
+  obs = lab.observe(leak, +$('nz').value / 100, rnd);
+  $('eng').textContent = T[L].eng(lab.stats.solves - s0, (performance.now() - t).toFixed(0));
+  gTop.querySelectorAll('.true,.pulse,.ai,.m0').forEach((e) => e.remove()); gSet.innerHTML = '';
+  const [cx, cy] = P(leak.node); mk('circle', { cx, cy, r: 30, class: 'pulse' }, gTop); mk('circle', { cx, cy, r: 30, class: 'true' }, gTop);
+  $('hint').classList.add('hide'); $('find').disabled = !lab.model; $('res').classList.add('hide'); lastFind = null;
+  kpis(); paint();
+}
+svg.addEventListener('click', (e) => { if (e.target.tagName === 'line') place(+e.target.dataset.i); });
+$('dm').oninput = () => { $('dmO').textContent = $('dm').value + ' mm'; run(); };
+$('nz').oninput = () => { $('nzO').textContent = $('nz').value + ' cm'; run(); };
+$('hr').oninput = () => { $('hrO').textContent = String($('hr').value).padStart(2, '0') + ':00'; lab.setHour(+$('hr').value); run(); };
+function setDR(on, seed) { $('dr').classList.toggle('on', on); lab.setWorld(on ? (seed ?? (Math.random() * 1e9) | 0) : null); }
+$('dr').onclick = () => { setDR(!$('dr').classList.contains('on')); run(); };
+
+function setKm(set) { const s = new Set(); set.forEach((n) => (linkOf[n] || []).forEach((l) => s.add(l))); let m = 0; s.forEach((l) => (m += l.len)); return m / 1000; }
+function locate(o, node, which) { const r = lab.infer(o.x, which), d = lab.dist(node)[r.best]; return { r, d, hit: r.set.includes(node), km: setKm(r.set) }; }
+function showFind(F) {
+  const tag = (h) => `<span class="tag ${h ? 'hit' : 'miss'}">${h ? T[L].hit : T[L].miss}</span>`;
+  $('r1e').textContent = Math.round(F.m1.d) + ' m'; $('r1a').textContent = F.m1.km.toFixed(1) + ' km'; $('r1t').innerHTML = tag(F.m1.hit);
+  $('r0e').textContent = Math.round(F.m0.d) + ' m'; $('r0a').textContent = F.m0.km.toFixed(1) + ' km'; $('r0t').innerHTML = tag(F.m0.hit);
+  $('res').classList.remove('hide');
+}
+$('find').onclick = () => {
+  const m1 = locate(obs, leak.node, 'M1'), m0 = locate(obs, leak.node, 'M0'); lastFind = { m1, m0 };
+  gSet.innerHTML = ''; gTop.querySelectorAll('.ai,.m0').forEach((e) => e.remove());
+  m1.r.set.forEach((n) => { const [cx, cy] = P(n); mk('circle', { cx, cy, r: 80, class: 'set' }, gSet); });
+  const [bx, by] = P(m0.r.best); mk('circle', { cx: bx, cy: by, r: 58, class: 'm0' }, gTop);
+  const [ax, ay] = P(m1.r.best); mk('circle', { cx: ax, cy: ay, r: 52, class: 'ai' }, gTop);
+  showFind(lastFind);
+};
+
+function med(a) { const s = [...a].sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; }
+function showStress(S) {
+  for (const [k, r] of [['1', S.m1], ['0', S.m0]]) {
+    $('s' + k + 'a').textContent = `${Math.round(100 * r.w / S.n)}%`; $('s' + k + 'b').textContent = Math.round(med(r.e)) + ' m'; $('s' + k + 'c').textContent = `${Math.round(100 * r.c / S.n)}%`;
+  }
+  $('st').classList.remove('hide');
+}
+$('stress').onclick = async () => {
+  const N = +(Q.get('n') || 100), J = lab.junctions, drOn = $('dr').classList.contains('on'), world = lab.world;
+  const R = lab.rngOf(+(Q.get('seed') || 2026)); const S = { n: 0, m1: { w: 0, c: 0, e: [] }, m0: { w: 0, c: 0, e: [] } }; lastStress = S;
+  $('stress').disabled = true; $('stress').textContent = T[L].running;
+  const s0 = lab.stats.solves, t = performance.now();
+  for (let k = 0; k < N; k++) {
+    if (drOn) lab.setWorld((R() * 1e9) | 0);
+    lab.setHour((R() * 24) | 0);   // 每个漏点随机时刻
+    const node = J[(R() * J.length) | 0], o = lab.observe({ node, dmm: 8 + R() * 17 }, +$('nz').value / 100, R);
+    if (o.leakFlow < 0.5) continue;
+    S.n++;
+    for (const w of ['m1', 'm0']) { const f = locate(o, node, w === 'm1' ? 'M1' : 'M0'); S[w].e.push(f.d); if (f.d <= 300) S[w].w++; if (f.hit) S[w].c++; }
+    $('prog').style.width = (100 * (k + 1) / N) + '%'; showStress(S);
+    if (k % 3 === 2) await new Promise((r) => setTimeout(r, 0));
+  }
+  $('eng').textContent = T[L].eng(lab.stats.solves - s0, (performance.now() - t).toFixed(0));
+  if (drOn) lab.setWorld(world);
+  lab.setHour(+$('hr').value);
+  $('stress').disabled = false; $('stress').textContent = T[L].run50;
+  window.stressDone = S;
+};
+
+// 自动演示参数（录视频、截图用）：?leak=p645&dmm=16&hour=3&noise=2&dr=123&find=1&stress=1
+if (Q.get('hour')) { $('hr').value = Q.get('hour'); $('hr').oninput(); }
+if (Q.get('dmm')) { $('dm').value = Q.get('dmm'); $('dmO').textContent = $('dm').value + ' mm'; }
+if (Q.get('noise')) { $('nz').value = Q.get('noise'); $('nzO').textContent = $('nz').value + ' cm'; }
+if (Q.get('dr')) setDR(true, +Q.get('dr'));
+if (Q.get('noiseSeed')) rnd = lab.rngOf(+Q.get('noiseSeed'));
+if (Q.get('leak')) { const l = lab.links.find((x) => x.id === Q.get('leak')); if (l) place(l.i); }
+if (Q.get('find') && leak) $('find').onclick();
+if (Q.get('stress')) await $('stress').onclick();
+window.ready = true;
+</script>
+</body>
+</html>
