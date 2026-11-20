@@ -36,6 +36,7 @@ main { display: grid; grid-template-columns: 1fr 400px; min-height: 0; }
 #map { width: 100%; height: 100%; display: block; cursor: crosshair; }
 #map line { stroke: var(--pipe); stroke-linecap: round; transition: stroke 0.45s, stroke-width 0.45s; }
 #map line:hover { stroke: var(--blue); stroke-width: 18; }
+#map .heat { stroke: #fff; stroke-width: 3; pointer-events: none; }
 #map .sen { fill: #fff; stroke: var(--ink); stroke-width: 3; pointer-events: none; transition: fill 0.45s; }
 #map .set { fill: oklch(0.52 0.17 252 / 0.13); pointer-events: none; }
 #map .ai { fill: none; stroke: var(--blue); stroke-width: 9; pointer-events: none; }
@@ -87,7 +88,7 @@ tr.us td { color: var(--ink); } tr.them td { color: var(--soft); }
 .info:hover::after, .info:focus::after { content: attr(data-tip); position: absolute; right: -8px; top: 22px; width: 250px; background: var(--ink); color: #fff; font: 500 12px/1.45 var(--ui); padding: 9px 11px; border-radius: 8px; z-index: 5; text-align: left; white-space: normal; }
 .url { position: absolute; right: 18px; top: 18px; font: 700 15px var(--ui); color: var(--blue); background: #fff; border: 1px solid var(--line); padding: 8px 14px; border-radius: 10px; }
 .hide { display: none !important; }
-@media (max-width: 900px) { body { overflow: auto; grid-template-rows: auto 1fr; } header { flex-wrap: wrap; padding: 10px 16px; gap: 10px; } main { grid-template-columns: 1fr; } #mapWrap { height: 60vh; } .engine { display: none; } }
+@media (max-width: 900px) { body { overflow: auto; grid-template-rows: auto 1fr; } header { flex-wrap: wrap; padding: 10px 16px; gap: 10px; } main { grid-template-columns: 1fr; } #mapWrap { height: auto; aspect-ratio: 1 / 1; } .engine { display: none; } }
 </style>
 </head>
 <body>
@@ -109,6 +110,7 @@ tr.us td { color: var(--ink); } tr.them td { color: var(--soft); }
       <span><i class="sw-ai"></i>LeakBack</span>
       <span><i class="sw-m0"></i><span data-i="lgM0">Standard model</span></span>
       <span><i class="sw-set"></i><span data-i="lgS">Search area</span></span>
+      <span id="lgBlind" class="hide"><i class="sw-true" style="background:var(--ok)"></i>≤100 m <i class="sw-true" style="background:oklch(0.80 0.14 80)"></i>≤300 m <i class="sw-true" style="background:var(--leak)"></i><span data-i="lgBl">blind spot</span> <i class="sw-true" style="background:var(--pipe)"></i><span data-i="lgNc">not covered</span></span>
     </div>
   </div>
   <aside>
@@ -116,7 +118,7 @@ tr.us td { color: var(--ink); } tr.them td { color: var(--soft); }
       <h2><span data-i="scene">Scenario</span><span class="info" tabindex="0" id="tipScene" data-tip=""></span></h2>
       <div class="row"><span data-i="hour">Time of day</span><input id="hr" type="range" min="0" max="23" value="3" aria-label="hour"><output id="hrO">03:00</output></div>
       <div class="row"><span data-i="size">Hole size</span><input id="dm" type="range" min="8" max="25" value="16" aria-label="hole"><output id="dmO">16 mm</output></div>
-      <div class="row"><span data-i="noise">Sensor noise</span><input id="nz" type="range" min="0" max="5" step="0.5" value="0" aria-label="noise"><output id="nzO">0 cm</output></div>
+      <div class="row"><span data-i="noise">Sensor noise</span><input id="nz" type="range" min="0" max="8" step="0.5" value="1" aria-label="noise"><output id="nzO">×1</output></div>
       <div class="toggle"><span data-i="dr">Real network differs from the model (±10%)</span><button class="sw" id="dr" aria-label="model error"></button></div>
     </section>
     <section>
@@ -130,6 +132,7 @@ tr.us td { color: var(--ink); } tr.them td { color: var(--soft); }
     </section>
     <section>
       <button class="big" id="find" disabled data-i="find">Locate with AI</button>
+      <div id="ncNote" class="hide" style="margin-top:12px;font-size:13px;color:var(--soft)"></div>
       <table id="res" class="hide">
         <thead><tr><th></th><th data-i="cErr">Error</th><th data-i="cArea">Search area</th><th></th></tr></thead>
         <tbody>
@@ -140,7 +143,7 @@ tr.us td { color: var(--ink); } tr.them td { color: var(--soft); }
     </section>
     <section>
       <h2><span data-i="stress">Stress test</span><span class="info" tabindex="0" id="tipStress" data-tip=""></span></h2>
-      <button class="ghost" id="stress" data-i="run50">Drop 100 random leaks</button>
+      <button class="ghost" id="stress" data-i="run50">Drop 300 random leaks</button>
       <div class="prog"><i id="prog"></i></div>
       <table id="st" class="hide">
         <thead><tr><th></th><th data-i="c300">≤ 300 m</th><th data-i="cMed">Median error</th><th data-i="cCov">In area</th></tr></thead>
@@ -150,6 +153,16 @@ tr.us td { color: var(--ink); } tr.them td { color: var(--soft); }
         </tbody>
       </table>
     </section>
+    <section>
+      <h2><span data-i="blind">Blind-spot map</span><span class="info" tabindex="0" id="tipBlind" data-tip=""></span></h2>
+      <button class="ghost" id="blindBtn" data-i="blindRun">Test a leak at every junction</button>
+      <div class="prog"><i id="prog2"></i></div>
+      <div class="kpis hide" id="blindK" style="margin-top:14px">
+        <div class="kpi"><div class="v" id="bA">—</div><div class="l" data-i="bAl">found within 300 m</div></div>
+        <div class="kpi"><div class="v" id="bB">—</div><div class="l" data-i="bBl">blind-spot junctions</div></div>
+        <div class="kpi"><div class="v" id="bC">—</div><div class="l" data-i="bCl">median error</div></div>
+      </div>
+    </section>
   </aside>
 </main>
 <script type="module">
@@ -157,15 +170,19 @@ import { createLab } from './engine.js';
 const T = {
   en: { nav1: 'Live twin', nav2: 'Real 2019 data', hint: 'Click any pipe to create a leak', loading: 'Loading the hydraulic engine…', lg: 'Pressure drop', lgT: 'True leak', lgM0: 'Standard model', lgS: 'Search area',
     scene: 'Scenario', hour: 'Time of day', size: 'Hole size', noise: 'Sensor noise', dr: 'Real network differs from the model (±10%)', leak: 'Leak', kq: 'Leak flow, m³/h', kd: 'Max drop, m', year: 'Lost per year, gal',
-    find: 'Locate with AI', cErr: 'Error', cArea: 'Search area', hit: 'In area', miss: 'Missed', stress: 'Stress test', run50: 'Drop 100 random leaks', running: 'Running…', c300: '≤ 300 m', cMed: 'Median error', cCov: 'In area',
-    tipScene: 'Every change re-runs EPANET in your browser. With the switch on, the hidden "real" town gets random pipe roughness, diameter and demand errors that the AI never sees.',
-    tipStress: 'Each leak: a random junction, hole size and hour, a fresh hydraulic solve, then both models locate it from the 33 sensors only. Simulation results. Model errors hurt the standard model more; sensor noise above ~1 cm erases the gap, which is why the median error on real 2019 data was 237 m.',
+    find: 'Locate with AI', cErr: 'Error', cArea: 'Search area', hit: 'In area', miss: 'Missed', stress: 'Stress test', run50: 'Drop 300 random leaks', running: 'Running…', c300: '≤ 300 m', cMed: 'Median error', cCov: 'In area',
+    tipScene: 'Every change re-runs EPANET in your browser. With the switch on, the hidden "real" town gets random pipe roughness, diameter and demand errors that the AI never sees. Sensor noise ×1 is the noise measured on the 33 real L-Town sensors in 2018.',
+    tipStress: 'Each leak: a random junction, hole size and hour, a fresh hydraulic solve, then both models locate it from the 33 sensors only. Simulation results. With model errors and real-level sensor noise, LeakBack lands within 300 m in about 94% of cases and the standard model in about 91%. At 4× the real noise both fall below 80%. Real data adds errors this simulation does not have: the median error on real 2019 alarms was 237 m.',
+    blind: 'Blind-spot map', blindRun: 'Test a leak at every junction', bAl: 'found within 300 m', bBl: 'blind-spot junctions', bCl: 'median error', lgBl: 'blind spot', lgNc: 'tank-fed zone, not in training', ncNote: 'This zone is fed by the tank. LeakBack was trained on reservoir inflow only, so it does not cover this zone yet (a known limitation).',
+    tipBlind: 'A leak of the chosen size is placed at each of the 782 junctions in turn, EPANET is re-solved and LeakBack locates it from the 33 sensors. Red junctions are where the current sensors cannot pin a leak within 300 m: the best places for the next pressure logger. Grey: the tank-fed zone, not yet covered by the model.',
     eng: (n, ms) => `EPANET 2.3 · WebAssembly · ${n} solves` + (CAP ? '' : ` in ${ms} ms`) },
   zh: { nav1: '实时孪生', nav2: '2019 真实数据', hint: '点任意一根管道，制造一个漏点', loading: '正在加载水力引擎…', lg: '压力下降', lgT: '真实漏点', lgM0: '普通模型', lgS: '挖掘范围',
     scene: '场景', hour: '时刻', size: '漏孔直径', noise: '压力表噪声', dr: '真实管网与模型有误差（±10%）', leak: '漏点', kq: '漏水量 m³/h', kd: '最大压降 m', year: '一年漏掉 m³',
-    find: '让 AI 定位', cErr: '误差', cArea: '挖掘范围', hit: '圈住', miss: '没圈住', stress: '压力测试', run50: '随机放 100 个漏点', running: '计算中…', c300: '300 米内', cMed: '中位误差', cCov: '圈住',
-    tipScene: '每次改动都会在浏览器里重新跑一次 EPANET。打开开关后，后台的「真实小镇」管道粗糙度、管径和用水量会随机偏差，AI 看不到这些偏差。',
-    tipStress: '每个漏点：随机位置、孔径和时刻，重新水力计算，两个模型只看 33 个压力表去找。这是仿真结果。管网误差对普通模型伤害更大；压力表噪声超过约 1 厘米，两者差距就消失了，这也是 2019 年真实数据中位误差为 237 米的原因。',
+    find: '让 AI 定位', cErr: '误差', cArea: '挖掘范围', hit: '圈住', miss: '没圈住', stress: '压力测试', run50: '随机放 300 个漏点', running: '计算中…', c300: '300 米内', cMed: '中位误差', cCov: '圈住',
+    tipScene: '每次改动都会在浏览器里重新跑一次 EPANET。打开开关后，后台的「真实小镇」管道粗糙度、管径和用水量会随机偏差，AI 看不到这些偏差。压力表噪声 ×1 是 2018 年 33 个真实压力表实测的噪声水平。',
+    tipStress: '每个漏点：随机位置、孔径和时刻，重新水力计算，两个模型只看 33 个压力表去找。这是仿真结果。管网有误差、压力表噪声为真实水平时，LeakBack 约 94% 能在 300 米内找到，普通模型约 91%；噪声放大到 4 倍，两者都跌到 80% 以下。真实数据里还有这个仿真没有的误差，2019 年真实报警的中位误差是 237 米。',
+    blind: '全网盲区图', blindRun: '在每个节点各放一次漏点', bAl: '300 米内找到', bBl: '盲区节点', bCl: '中位误差', lgBl: '盲区', lgNc: '水箱供水区，未训练', ncNote: '这片区域由水箱供水。LeakBack 训练时只用了水库进水量，所以暂时覆盖不到这里（已知局限）。',
+    tipBlind: '在 782 个节点上依次放一个漏点（孔径按当前设置），每次重新水力计算，让 LeakBack 只看 33 个压力表去找。红色节点是现有压力表无法在 300 米内定位的地方，也就是下一个压力表最该装的位置。灰色是水箱供水区，模型暂未覆盖。',
     eng: (n, ms) => `EPANET 2.3 · WebAssembly · ${n} 次计算` + (CAP ? '' : ` ${ms} 毫秒`) },
 };
 const Q = new URLSearchParams(location.search), CAP = Q.has('cap');
@@ -176,7 +193,7 @@ function lang(l) {
   L = l; document.documentElement.lang = l;
   document.querySelectorAll('[data-i]').forEach((e) => (e.textContent = T[l][e.dataset.i]));
   document.querySelectorAll('#lang button').forEach((b) => b.classList.toggle('on', b.dataset.l === l));
-  $('tipScene').dataset.tip = T[l].tipScene; $('tipStress').dataset.tip = T[l].tipStress; $('tipScene').textContent = $('tipStress').textContent = 'i';
+  $('tipScene').dataset.tip = T[l].tipScene; $('tipStress').dataset.tip = T[l].tipStress; $('tipBlind').dataset.tip = T[l].tipBlind; $('tipScene').textContent = $('tipStress').textContent = $('tipBlind').textContent = 'i';
   $('kYl').textContent = T[l].year;
   if (!leak) $('hint').textContent = lab ? T[l].hint : T[l].loading;
   if (obs) kpis(); if (lastFind) showFind(lastFind); if (lastStress) showStress(lastStress);
@@ -229,23 +246,26 @@ function kpis() {
 function place(linkIdx) {
   const l = lab.links[linkIdx - 1];
   const node = [l.a, l.b].find((n) => lab.nodes[n - 1].type === 0) || l.a;
-  leak = { link: l.id, linkIdx, node }; run();
+  leak = { link: l.id, linkIdx, node }; clearBlind(); run();
 }
 let rnd = Math.random;
+// 噪声 = 滑块倍数 × 2018 年真实压力表实测噪声（每个表各自的标准差，米）
+const SIG = lab.model && lab.model.noise ? lab.model.noise : lab.sensors.map(() => 0.0033);
+function noiseOf() { const k = +$('nz').value; return SIG.map((v) => v * k); }
 function run() {
   if (!leak) return;
   leak.dmm = +$('dm').value;
   const s0 = lab.stats.solves, t = performance.now();
-  obs = lab.observe(leak, +$('nz').value / 100, rnd);
+  obs = lab.observe(leak, noiseOf(), rnd);
   $('eng').textContent = T[L].eng(lab.stats.solves - s0, (performance.now() - t).toFixed(0));
   gTop.querySelectorAll('.true,.pulse,.ai,.m0').forEach((e) => e.remove()); gSet.innerHTML = '';
   const [cx, cy] = P(leak.node); mk('circle', { cx, cy, r: 30, class: 'pulse' }, gTop); mk('circle', { cx, cy, r: 30, class: 'true' }, gTop);
-  $('hint').classList.add('hide'); $('find').disabled = !lab.model; $('res').classList.add('hide'); lastFind = null;
+  $('hint').classList.add('hide'); $('find').disabled = !lab.model; $('res').classList.add('hide'); $('ncNote').classList.add('hide'); lastFind = null;
   kpis(); paint();
 }
 svg.addEventListener('click', (e) => { if (e.target.tagName === 'line') place(+e.target.dataset.i); });
 $('dm').oninput = () => { $('dmO').textContent = $('dm').value + ' mm'; run(); };
-$('nz').oninput = () => { $('nzO').textContent = $('nz').value + ' cm'; run(); };
+$('nz').oninput = () => { $('nzO').textContent = '×' + $('nz').value; run(); };
 $('hr').oninput = () => { $('hrO').textContent = String($('hr').value).padStart(2, '0') + ':00'; lab.setHour(+$('hr').value); run(); };
 function setDR(on, seed) { $('dr').classList.toggle('on', on); lab.setWorld(on ? (seed ?? (Math.random() * 1e9) | 0) : null); }
 $('dr').onclick = () => { setDR(!$('dr').classList.contains('on')); run(); };
@@ -259,6 +279,7 @@ function showFind(F) {
   $('res').classList.remove('hide');
 }
 $('find').onclick = () => {
+  if (obs.featFlow < 0.5) { $('ncNote').textContent = T[L].ncNote; $('ncNote').classList.remove('hide'); return; }
   const m1 = locate(obs, leak.node, 'M1'), m0 = locate(obs, leak.node, 'M0'); lastFind = { m1, m0 };
   gSet.innerHTML = ''; gTop.querySelectorAll('.ai,.m0').forEach((e) => e.remove());
   m1.r.set.forEach((n) => { const [cx, cy] = P(n); mk('circle', { cx, cy, r: 80, class: 'set' }, gSet); });
@@ -275,19 +296,19 @@ function showStress(S) {
   $('st').classList.remove('hide');
 }
 $('stress').onclick = async () => {
-  const N = +(Q.get('n') || 100), J = lab.junctions, drOn = $('dr').classList.contains('on'), world = lab.world;
+  const N = +(Q.get('n') || 300), J = lab.junctions, drOn = $('dr').classList.contains('on'), world = lab.world;
   const R = lab.rngOf(+(Q.get('seed') || 2026)); const S = { n: 0, m1: { w: 0, c: 0, e: [] }, m0: { w: 0, c: 0, e: [] } }; lastStress = S;
   $('stress').disabled = true; $('stress').textContent = T[L].running;
   const s0 = lab.stats.solves, t = performance.now();
   for (let k = 0; k < N; k++) {
     if (drOn) lab.setWorld((R() * 1e9) | 0);
     lab.setHour((R() * 24) | 0);   // 每个漏点随机时刻
-    const node = J[(R() * J.length) | 0], o = lab.observe({ node, dmm: 8 + R() * 17 }, +$('nz').value / 100, R);
-    if (o.leakFlow < 0.5) continue;
+    const node = J[(R() * J.length) | 0], o = lab.observe({ node, dmm: 8 + R() * 17 }, noiseOf(), R);
+    if (o.featFlow < 0.5) continue;   // 水箱供水区：模型未覆盖（见局限）
     S.n++;
     for (const w of ['m1', 'm0']) { const f = locate(o, node, w === 'm1' ? 'M1' : 'M0'); S[w].e.push(f.d); if (f.d <= 300) S[w].w++; if (f.hit) S[w].c++; }
     $('prog').style.width = (100 * (k + 1) / N) + '%'; showStress(S);
-    if (k % 3 === 2) await new Promise((r) => setTimeout(r, 0));
+    if (k % 6 === 5) await new Promise((r) => setTimeout(r, 0));
   }
   $('eng').textContent = T[L].eng(lab.stats.solves - s0, (performance.now() - t).toFixed(0));
   if (drOn) lab.setWorld(world);
@@ -296,15 +317,44 @@ $('stress').onclick = async () => {
   window.stressDone = S;
 };
 
+// ---------- 全网盲区图 ----------
+const gHeat = mk('g', {}); svg.insertBefore(gHeat, gTop);
+function clearBlind() { gHeat.innerHTML = ''; $('lgBlind').classList.add('hide'); }
+$('blindBtn').onclick = async () => {
+  const J = lab.junctions, dmm = +$('dm').value, nz = noiseOf(), R = lab.rngOf(+(Q.get('seed') || 2026));
+  $('blindBtn').disabled = true; $('blindBtn').textContent = T[L].running;
+  gTop.querySelectorAll('.true,.pulse,.ai,.m0').forEach((e) => e.remove()); gSet.innerHTML = ''; $('res').classList.add('hide');
+  pipeEl.forEach((e) => { e.style.transitionDelay = '0s'; e.style.stroke = ''; e.setAttribute('stroke-width', 10); });
+  senEl.forEach((e) => (e.style.fill = '#fff'));
+  clearBlind(); $('lgBlind').classList.remove('hide'); $('hint').classList.add('hide');
+  const s0 = lab.stats.solves, t = performance.now(), errs = []; let w = 0, blind = 0, nc = 0;
+  for (let k = 0; k < J.length; k++) {
+    const node = J[k], o = lab.observe({ node, dmm }, nz, R);
+    if (o.leakFlow < 0.5) continue;
+    if (o.featFlow < 0.5) { const [gx, gy] = P(node); mk('circle', { cx: gx, cy: gy, r: 17, class: 'heat', fill: 'var(--pipe)' }, gHeat); nc++; continue; }
+    const r = lab.infer(o.x, 'M1'), d = lab.dist(node)[r.best]; errs.push(d); if (d <= 300) w++; else blind++;
+    const [cx, cy] = P(node);
+    mk('circle', { cx, cy, r: 17, class: 'heat', fill: d <= 100 ? 'var(--ok)' : d <= 300 ? 'oklch(0.80 0.14 80)' : 'var(--leak)' }, gHeat);
+    if (k % 12 === 11) { $('prog2').style.width = (100 * (k + 1) / J.length) + '%'; await new Promise((res) => setTimeout(res, 0)); }
+  }
+  $('prog2').style.width = '100%';
+  $('bA').textContent = Math.round(100 * w / errs.length) + '%'; $('bB').textContent = blind; $('bC').innerHTML = Math.round(med(errs)) + '<small>m</small>';
+  $('blindK').classList.remove('hide');
+  $('eng').textContent = T[L].eng(lab.stats.solves - s0, (performance.now() - t).toFixed(0));
+  $('blindBtn').disabled = false; $('blindBtn').textContent = T[L].blindRun;
+  window.blindDone = { n: errs.length, w, blind, nc, med: med(errs) };
+};
+
 // 自动演示参数（录视频、截图用）：?leak=p645&dmm=16&hour=3&noise=2&dr=123&find=1&stress=1
 if (Q.get('hour')) { $('hr').value = Q.get('hour'); $('hr').oninput(); }
 if (Q.get('dmm')) { $('dm').value = Q.get('dmm'); $('dmO').textContent = $('dm').value + ' mm'; }
-if (Q.get('noise')) { $('nz').value = Q.get('noise'); $('nzO').textContent = $('nz').value + ' cm'; }
+if (Q.get('noise')) { $('nz').value = Q.get('noise'); $('nzO').textContent = '×' + $('nz').value; }
 if (Q.get('dr')) setDR(true, +Q.get('dr'));
 if (Q.get('noiseSeed')) rnd = lab.rngOf(+Q.get('noiseSeed'));
 if (Q.get('leak')) { const l = lab.links.find((x) => x.id === Q.get('leak')); if (l) place(l.i); }
 if (Q.get('find') && leak) $('find').onclick();
 if (Q.get('stress')) await $('stress').onclick();
+if (Q.get('blind')) await $('blindBtn').onclick();
 window.ready = true;
 </script>
 </body>

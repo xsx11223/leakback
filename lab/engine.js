@@ -58,9 +58,10 @@ export async function createLab(inpUrl, modelUrl) {
     const p = new Float64Array(nN + 1);
     for (let i = 1; i <= nN; i++) p[i] = m.getNodeValue(i, NodeProperty.Pressure);
     let q = 0; for (const s of sources) q -= m.getNodeValue(s, NodeProperty.Demand);
+    const qall = q - (tank ? m.getNodeValue(tank.i, NodeProperty.Demand) : 0);   // 含水箱出流
     m.closeH();
     solves++; solveMs += performance.now() - t;
-    return { p, q };
+    return { p, q, qall };
   }
   function setHour(h) { hour = h; m.setTimeParameter(TimeParameter.PatternStart, Math.round(h * 3600)); }
   function setMult(x) { m.setOption(Option.DemandMult, x); }
@@ -91,19 +92,22 @@ export async function createLab(inpUrl, modelUrl) {
 
   // 一次「观测」：基线三次拟合 g，漏损一次，得到 33 维特征（与 simgen.py 相同）
   function observe(leak, noise = 0, rnd = Math.random) {
-    const P = [], Q = [];
-    for (const k of [0.85, 1.0, 1.15]) { setMult(k); const r = solve(); P.push(r.p); Q.push(r.q); }
+    const P = [], Q = []; let qall0 = 0;
+    for (const k of [0.85, 1.0, 1.15]) { setMult(k); const r = solve(); P.push(r.p); Q.push(r.q); if (k === 1.0) qall0 = r.qall; }
     setMult(1);
     const qm = (Q[0] + Q[1] + Q[2]) / 3, qv = Q.reduce((s, q) => s + (q - qm) ** 2, 0);
     const g = sensors.map((s) => { const pm = (P[0][s] + P[1][s] + P[2][s]) / 3; return Q.reduce((acc, q, k) => acc + (q - qm) * (P[k][s] - pm), 0) / qv; });
-    let p1 = P[1], q1 = Q[1];
-    if (leak) { setEmitter(leak.node, leak.dmm); const r = solve(); p1 = r.p; q1 = r.q; setEmitter(leak.node, 0); }
+    let p1 = P[1], q1 = Q[1], qall1 = qall0;
+    if (leak) { setEmitter(leak.node, leak.dmm); const r = solve(); p1 = r.p; q1 = r.q; qall1 = r.qall; setEmitter(leak.node, 0); }
     const dQ = q1 - Q[1];
     // 训练时 Q 用 m3/s，这里是 m3/h；g 用同一单位拟合，g·ΔQ 与单位无关
-    const nz = () => noise ? noise * Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd()) : 0;
-    const x = sensors.map((s, k) => (p1[s] - P[1][s]) - g[k] * dQ + nz());   // 压力表读数噪声（米）
+    const gn = () => Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd());
+    const nz = () => noise ? noise * gn() : 0;
+    // noise：数字=统一标准差（米）；数组=每个压力表各自的标准差（2018 年实测 × 倍数）
+    const x = sensors.map((s, k) => (p1[s] - P[1][s]) - g[k] * dQ + (Array.isArray(noise) ? noise[k] * gn() : nz()));
     const drop = new Float64Array(nN + 1); for (let i = 1; i <= nN; i++) drop[i] = P[1][i] - p1[i];
-    return { x, drop, leakFlow: dQ, base: P[1], press: p1 };
+    // leakFlow：真实漏水量（含水箱供水区）；featFlow：特征用的水库进水变化（与训练一致，<0.5 表示模型未覆盖）
+    return { x, drop, leakFlow: qall1 - qall0, featFlow: dQ, base: P[1], press: p1 };
   }
 
   // 定位网络（sklearn MLP：ReLU, ReLU, softmax）
@@ -127,11 +131,12 @@ export async function createLab(inpUrl, modelUrl) {
   // 管网最短路距离（米）
   function dist(from) {
     const d = new Float64Array(nN + 1).fill(Infinity); d[from] = 0;
-    const seen = new Uint8Array(nN + 1), heap = [[0, from]];
-    while (heap.length) {
-      let bi = 0; for (let i = 1; i < heap.length; i++) if (heap[i][0] < heap[bi][0]) bi = i;
-      const [du, u] = heap.splice(bi, 1)[0]; if (seen[u]) continue; seen[u] = 1;
-      for (const [v, w] of adj[u]) if (du + w < d[v]) { d[v] = du + w; heap.push([d[v], v]); }
+    const H = [[0, from]];                       // 二叉堆
+    const push = (x) => { H.push(x); let i = H.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (H[p][0] <= H[i][0]) break; [H[p], H[i]] = [H[i], H[p]]; i = p; } };
+    const pop = () => { const top = H[0], last = H.pop(); if (H.length) { H[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < H.length && H[l][0] < H[m][0]) m = l; if (r < H.length && H[r][0] < H[m][0]) m = r; if (m === i) break; [H[m], H[i]] = [H[i], H[m]]; i = m; } } return top; };
+    while (H.length) {
+      const [du, u] = pop(); if (du > d[u]) continue;
+      for (const [v, w] of adj[u]) if (du + w < d[v]) { d[v] = du + w; push([d[v], v]); }
     }
     return d;
   }
