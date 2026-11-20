@@ -1,6 +1,6 @@
 // LeakBack Live Lab — 浏览器内真实水力引擎（EPANET 2.3 WebAssembly）+ 定位网络推理
 // 与 src/leak/simgen.py、localize.py 的定义逐条对应。
-import { Project, Workspace, NodeProperty, LinkProperty, TimeParameter, CountType, InitHydOption, NodeType, LinkType, Option } from 'https://cdn.jsdelivr.net/npm/epanet-js@0.9.0/dist/index.mjs';
+import { Project, Workspace, NodeProperty, LinkProperty, TimeParameter, CountType, InitHydOption, NodeType, LinkType, Option } from './vendor/epanet-js/index.js';
 
 export async function createLab(inpUrl, modelUrl) {
   const ws = new Workspace(); await ws.loadModule();

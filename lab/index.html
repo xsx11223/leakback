@@ -85,6 +85,7 @@ tr.us td { color: var(--ink); } tr.them td { color: var(--soft); }
 .prog i { display: block; height: 100%; width: 0; background: var(--blue); transition: width .2s; }
 .info { position: relative; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--mute); color: var(--mute); font: 700 10px var(--ui); cursor: help; text-transform: none; letter-spacing: 0; }
 .info:hover::after, .info:focus::after { content: attr(data-tip); position: absolute; right: -8px; top: 22px; width: 250px; background: var(--ink); color: #fff; font: 500 12px/1.45 var(--ui); padding: 9px 11px; border-radius: 8px; z-index: 5; text-align: left; white-space: normal; }
+.url { position: absolute; right: 18px; top: 18px; font: 700 15px var(--ui); color: var(--blue); background: #fff; border: 1px solid var(--line); padding: 8px 14px; border-radius: 10px; }
 .hide { display: none !important; }
 @media (max-width: 900px) { body { overflow: auto; grid-template-rows: auto 1fr; } header { flex-wrap: wrap; padding: 10px 16px; gap: 10px; } main { grid-template-columns: 1fr; } #mapWrap { height: 60vh; } .engine { display: none; } }
 </style>
@@ -101,6 +102,7 @@ tr.us td { color: var(--ink); } tr.them td { color: var(--soft); }
   <div id="mapWrap">
     <svg id="map" aria-label="L-Town water network"></svg>
     <div class="hint" id="hint">Loading…</div>
+    <div class="url hide" id="url">xsx11223.github.io/leakback</div>
     <div class="legend">
       <span><span data-i="lg">Pressure drop</span><i class="ramp"></i></span>
       <span><i class="sw-true"></i><span data-i="lgT">True leak</span></span>
@@ -158,18 +160,18 @@ const T = {
     find: 'Locate with AI', cErr: 'Error', cArea: 'Search area', hit: 'In area', miss: 'Missed', stress: 'Stress test', run50: 'Drop 100 random leaks', running: 'Running…', c300: '≤ 300 m', cMed: 'Median error', cCov: 'In area',
     tipScene: 'Every change re-runs EPANET in your browser. With the switch on, the hidden "real" town gets random pipe roughness, diameter and demand errors that the AI never sees.',
     tipStress: 'Each leak: a random junction, hole size and hour, a fresh hydraulic solve, then both models locate it from the 33 sensors only. Simulation results. Model errors hurt the standard model more; sensor noise above ~1 cm erases the gap, which is why the median error on real 2019 data was 237 m.',
-    eng: (n, ms) => `EPANET 2.3 · WebAssembly · ${n} solves in ${ms} ms` },
+    eng: (n, ms) => `EPANET 2.3 · WebAssembly · ${n} solves` + (CAP ? '' : ` in ${ms} ms`) },
   zh: { nav1: '实时孪生', nav2: '2019 真实数据', hint: '点任意一根管道，制造一个漏点', loading: '正在加载水力引擎…', lg: '压力下降', lgT: '真实漏点', lgM0: '普通模型', lgS: '挖掘范围',
     scene: '场景', hour: '时刻', size: '漏孔直径', noise: '压力表噪声', dr: '真实管网与模型有误差（±10%）', leak: '漏点', kq: '漏水量 m³/h', kd: '最大压降 m', year: '一年漏掉 m³',
     find: '让 AI 定位', cErr: '误差', cArea: '挖掘范围', hit: '圈住', miss: '没圈住', stress: '压力测试', run50: '随机放 100 个漏点', running: '计算中…', c300: '300 米内', cMed: '中位误差', cCov: '圈住',
     tipScene: '每次改动都会在浏览器里重新跑一次 EPANET。打开开关后，后台的「真实小镇」管道粗糙度、管径和用水量会随机偏差，AI 看不到这些偏差。',
     tipStress: '每个漏点：随机位置、孔径和时刻，重新水力计算，两个模型只看 33 个压力表去找。这是仿真结果。管网误差对普通模型伤害更大；压力表噪声超过约 1 厘米，两者差距就消失了，这也是 2019 年真实数据中位误差为 237 米的原因。',
-    eng: (n, ms) => `EPANET 2.3 · WebAssembly · ${n} 次计算 ${ms} 毫秒` },
+    eng: (n, ms) => `EPANET 2.3 · WebAssembly · ${n} 次计算` + (CAP ? '' : ` ${ms} 毫秒`) },
 };
-const Q = new URLSearchParams(location.search);
+const Q = new URLSearchParams(location.search), CAP = Q.has('cap');
 let L = Q.get('lang') || (navigator.language.startsWith('zh') ? 'zh' : 'en');
 const $ = (id) => document.getElementById(id);
-if (Q.has('cap')) document.body.classList.add('cap');
+if (Q.has('cap')) { document.body.classList.add('cap'); $('url').classList.remove('hide'); }
 function lang(l) {
   L = l; document.documentElement.lang = l;
   document.querySelectorAll('[data-i]').forEach((e) => (e.textContent = T[l][e.dataset.i]));
