@@ -87,6 +87,11 @@ tr.us td { color: var(--ink); } tr.them td { color: var(--soft); }
 .info { position: relative; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--mute); color: var(--mute); font: 700 10px var(--ui); cursor: help; text-transform: none; letter-spacing: 0; }
 .info:hover::after, .info:focus::after { content: attr(data-tip); position: absolute; right: -8px; top: 22px; width: 250px; background: var(--ink); color: #fff; font: 500 12px/1.45 var(--ui); padding: 9px 11px; border-radius: 8px; z-index: 5; text-align: left; white-space: normal; }
 .url { position: absolute; right: 18px; top: 18px; font: 700 15px var(--ui); color: var(--blue); background: #fff; border: 1px solid var(--line); padding: 8px 14px; border-radius: 10px; }
+#cur { position: fixed; left: 50%; top: 50%; width: 30px; height: 30px; z-index: 50; pointer-events: none; transition: left .8s cubic-bezier(.4,0,.2,1), top .8s cubic-bezier(.4,0,.2,1); }
+#cur svg { filter: drop-shadow(0 2px 4px oklch(0 0 0 / .35)); }
+#cur i { position: absolute; left: -16px; top: -16px; width: 32px; height: 32px; border-radius: 50%; border: 3px solid var(--blue); opacity: 0; }
+#cur.tap i { animation: tap .5s ease-out; }
+@keyframes tap { from { opacity: .9; transform: scale(.4); } to { opacity: 0; transform: scale(1.6); } }
 .hide { display: none !important; }
 @media (max-width: 900px) { body { overflow: auto; grid-template-rows: auto 1fr; } header { flex-wrap: wrap; padding: 10px 16px; gap: 10px; } main { grid-template-columns: 1fr; } #mapWrap { height: auto; aspect-ratio: 1 / 1; } .engine { display: none; } }
 </style>
@@ -355,6 +360,27 @@ if (Q.get('leak')) { const l = lab.links.find((x) => x.id === Q.get('leak')); if
 if (Q.get('find') && leak) $('find').onclick();
 if (Q.get('stress')) await $('stress').onclick();
 if (Q.get('blind')) await $('blindBtn').onclick();
+// 录屏演示：?demo=1，由录屏脚本调用 window.go() 开始；时间点与旁白对齐（秒）
+if (Q.get('demo')) {
+  const cur = document.createElement('div'); cur.id = 'cur';
+  cur.innerHTML = '<i></i><svg width="30" height="30" viewBox="0 0 24 24"><path d="M4 2.5 19 13l-6.6 1.2L9 20.5Z" fill="#fff" stroke="oklch(0.21 0.04 258)" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  document.body.appendChild(cur);
+  const at = (el) => { const r = el.getBoundingClientRect(); cur.style.left = (r.left + r.width / 2) + 'px'; cur.style.top = (r.top + r.height / 2) + 'px'; };
+  const tap = () => { cur.classList.remove('tap'); void cur.offsetWidth; cur.classList.add('tap'); };
+  const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+  const pipe = () => document.querySelector(`#map line[data-i="${lab.links.find((x) => x.id === (Q.get('leak') || 'p645')).i}"]`);
+  const T0 = (Q.get('t') || '12.5,26.6,39.5,44,59.8').split(',').map(Number);
+  window.go = async () => {
+    const t0 = performance.now(), until = (s) => wait(Math.max(0, s - (performance.now() - t0) / 1000));
+    cur.style.left = '62%'; cur.style.top = '70%';
+    await until(T0[0]); at(pipe()); await wait(0.85); tap(); place(+pipe().dataset.i);
+    await until(T0[1]); at($('find')); await wait(0.85); tap(); $('find').onclick();
+    await until(T0[2]); at($('dr')); await wait(0.85); tap(); setDR(true, 7); run(); $('find').onclick();
+    await until(T0[3]); at($('stress')); await wait(0.85); tap(); await $('stress').onclick();
+    await until(T0[4]); at($('blindBtn')); await wait(0.85); tap(); setDR(false); await $('blindBtn').onclick();
+    window.demoDone = (performance.now() - t0) / 1000;
+  };
+}
 window.ready = true;
 </script>
 </body>
